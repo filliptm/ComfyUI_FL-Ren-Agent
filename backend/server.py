@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.websocket import manager
 from backend.callback_router import CallbackRouter, current_session_id
+from backend.agent import agent_manager
 from backend.models import (
     Handshake,
     UserMessage,
@@ -76,7 +77,7 @@ async def lifespan(app: FastAPI):  # type: ignore
 app = FastAPI(
     title="FL_JS Agentic System",
     description="AI-powered ComfyUI workflow assistant",
-    version="0.1.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -95,7 +96,7 @@ async def root() -> dict[str, str]:
     """Root endpoint."""
     return {
         "name": "FL_JS Agentic System",
-        "version": "0.1.0",
+        "version": "0.3.0",
         "status": "running",
     }
 
@@ -108,6 +109,7 @@ async def health() -> dict[str, Any]:
         "active_connections": manager.get_active_session_count(),
         "total_sessions": manager.get_total_session_count(),
         "pending_callbacks": callback_router.get_pending_count() if callback_router else 0,
+        "active_agents": agent_manager.get_agent_count(),
     }
 
 
@@ -263,14 +265,29 @@ async def handle_user_message(session_id: str, data: dict[str, Any]) -> None:
         # Set session context for tool callbacks
         current_session_id.set(session_id)
         
-        # TODO: Process with agent
-        # For now, just echo back
+        # Send typing indicator
+        await manager.send_message(session_id, {
+            "type": "typing_indicator",
+            "session_id": session_id,
+            "is_typing": True,
+        })
+        
+        # Get or create agent for this session
+        agent = agent_manager.get_agent(session_id)
+        
+        # Process message with agent
+        response = await agent.run(message.content)
+        
+        # Send response
         await manager.send_message(session_id, {
             "type": "agent_response",
             "session_id": session_id,
-            "content": f"Echo: {message.content}",
+            "message": response.message,
+            "tool_calls": response.tool_calls,
             "is_final": True,
         })
+        
+        logger.info(f"Agent response sent to {session_id}")
     
     except Exception as e:
         logger.error(f"Error handling user message: {e}", exc_info=True)
