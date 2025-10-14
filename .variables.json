@@ -1,7 +1,7 @@
 {
   "current_mode": "implementation",
   "project": "fl_js",
-  "task": "Backend auto-start COMPLETE",
+  "task": "Phase 2 - Tool System",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
   "focus": "Create server_runner.py and update __init__.py",
@@ -30,7 +30,7 @@
     "log_output": "file + stdout",
     "auto_restart": true
   },
-  "implementation_phase": "complete",
+  "implementation_phase": "phase_2_in_progress",
   "auto_start_features": [
     "subprocess management",
     "port conflict detection",
@@ -44,5 +44,10 @@
     "backend/config.py",
     ".env.example",
     "README.md"
+  ],
+  "phase_2_step": "2_fl_api_wrapper",
+  "analysis_complete": "true",
+  "files_completed": [
+    "backend/callback_router.py"
   ]
 }

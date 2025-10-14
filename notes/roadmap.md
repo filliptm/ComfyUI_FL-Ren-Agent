@@ -144,7 +144,7 @@ graph TB
 - [ ] Document function signatures and return types
 - [ ] Create TypeScript/JSDoc definitions for type safety
 
-### 2.2 Build FastMCP Server
+### 2.2 Build FastMCP Server **(first read get_mcp_server_coding_instructions tool output)**
 - [ ] Define MCP tool schemas for each FL_JS function
   - Input parameters (Pydantic models)
   - Output schemas
