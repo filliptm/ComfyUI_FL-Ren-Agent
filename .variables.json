@@ -1,10 +1,10 @@
 {
-  "current_mode": "research",
+  "current_mode": "implementation",
   "project": "fl_js",
-  "task": "Backend auto-start research COMPLETE",
+  "task": "Backend auto-start COMPLETE",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "Documented subprocess approach and implementation plan",
+  "focus": "Create server_runner.py and update __init__.py",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "create backend directory structure and config files",
   "ui_integration": "app.extensionManager.registerSidebarTab",
@@ -16,13 +16,33 @@
     "frontend/session_manager.js",
     "frontend/ws_client.js"
   ],
-  "next_phase": "2",
+  "next_phase": "Phase 2 - Tool System",
   "files_created": [
-    "session_manager.js",
-    "ws_client.js"
+    "backend/server_runner.py",
+    "backend/logs/.gitkeep"
   ],
   "blocker": "need to understand ComfyUI initialization hooks",
   "next_action": "review findings with user",
   "overall_progress": "35%",
-  "research_complete": "true"
+  "research_complete": "true",
+  "decisions": {
+    "auto_start_default": true,
+    "log_output": "file + stdout",
+    "auto_restart": true
+  },
+  "implementation_phase": "complete",
+  "auto_start_features": [
+    "subprocess management",
+    "port conflict detection",
+    "health check",
+    "auto-restart on crash",
+    "dual logging (file + stdout)",
+    "graceful shutdown"
+  ],
+  "files_modified": [
+    "__init__.py",
+    "backend/config.py",
+    ".env.example",
+    "README.md"
+  ]
 }

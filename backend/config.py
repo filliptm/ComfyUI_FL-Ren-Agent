@@ -14,6 +14,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # === Backend Auto-Start ===
+    auto_start_backend: bool = True
+    auto_restart_backend: bool = True
+    log_backend_to_file: bool = True
+
     # LLM Provider Configuration
     llm_provider: Literal["openai", "anthropic", "gemini"] = "openai"
     llm_model: str = "gpt-4-turbo-preview"

@@ -34,6 +34,7 @@
 - **Dark theme** - Matches ComfyUI's aesthetic perfectly
 - **Real-time updates** - WebSocket-based instant communication
 - **Multi-session** - Each browser tab gets its own isolated agent
+- **🆕 Auto-start backend** - No manual server startup required!
 
 ---
 
@@ -87,33 +88,32 @@ LLM_MODEL=gpt-4-turbo-preview
 # Or: claude-3-opus-20240229, gemini-pro, etc.
 ```
 
-#### 4. Start the backend server
+#### 4. Start ComfyUI
 
-The backend must be running for the extension to work:
-
-```bash
-cd backend
-python server.py
-```
-
-You should see:
-```
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     WebSocket endpoint ready at ws://localhost:8000/ws
-```
-
-> **Keep this terminal open** while using FL_JS!
-
-#### 5. Start (or restart) ComfyUI
+🎉 **That's it!** The backend starts automatically when ComfyUI loads:
 
 ```bash
 cd /path/to/ComfyUI
 python main.py
 ```
 
-If ComfyUI was already running, **restart it** to load the extension.
+You should see:
+```
+================================================================================
+[FL_JS] Initializing FL_JS Agentic System...
+================================================================================
+[FL_JS] Starting backend server on port 8000...
+[FL_JS] Waiting for backend to be ready... Ready!
+[FL_JS] Backend server started successfully! (PID: 12345)
+[FL_JS] Auto-restart monitoring enabled
+================================================================================
+[FL_JS] Initialization complete!
+================================================================================
+```
 
-#### 6. Verify installation
+> **Note:** Backend logs are saved to `backend/logs/server.log`
+
+#### 5. Verify installation
 
 Open ComfyUI in your browser and check the **browser console** (F12):
 
@@ -128,6 +128,50 @@ Open ComfyUI in your browser and check the **browser console** (F12):
 ```
 
 If you see these messages, **you're ready to go!** 🎉
+
+---
+
+## ⚙️ Backend Configuration
+
+### Auto-Start Settings
+
+The backend automatically starts when ComfyUI loads. You can customize this behavior in `.env`:
+
+```bash
+# === Backend Auto-Start ===
+AUTO_START_BACKEND=true          # Enable/disable auto-start
+AUTO_RESTART_BACKEND=true        # Auto-restart if backend crashes
+LOG_BACKEND_TO_FILE=true         # Log to backend/logs/server.log
+WS_PORT=8000                     # Backend server port
+```
+
+### Manual Backend Start (Optional)
+
+If you prefer to start the backend manually:
+
+1. **Disable auto-start** in `.env`:
+   ```bash
+   AUTO_START_BACKEND=false
+   ```
+
+2. **Start manually** in a separate terminal:
+   ```bash
+   cd backend
+   python server.py
+   ```
+
+3. **Restart ComfyUI** to load the extension
+
+### Port Configuration
+
+If port 8000 is already in use:
+
+1. **Change the port** in `.env`:
+   ```bash
+   WS_PORT=8001
+   ```
+
+2. **Restart ComfyUI** (backend will use new port)
 
 ---
 
@@ -204,6 +248,14 @@ Agent: [Generates Mermaid diagram]
 │         └──────────────────┴────────────────────┘           │
 │                     Session Management                      │
 │              (Isolated per browser tab)                     │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              ServerRunner (Auto-Start)               │  │
+│  │  • Subprocess management                             │  │
+│  │  • Port conflict detection                           │  │
+│  │  • Auto-restart on crash                             │  │
+│  │  • Dual logging (file + stdout)                      │  │
+│  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -221,6 +273,7 @@ Agent: [Generates Mermaid diagram]
 
 #### Backend (Python)
 - **`backend/server.py`** - FastAPI application with WebSocket endpoint
+- **`backend/server_runner.py`** - 🆕 Subprocess manager for auto-start
 - **`backend/websocket.py`** - Connection manager, session routing
 - **`backend/config.py`** - Configuration and settings
 - **`backend/models.py`** - Pydantic models for messages and queries
@@ -238,6 +291,11 @@ Agent: [Generates Mermaid diagram]
 All configuration is in `.env` (copy from `.env.example`):
 
 ```bash
+# === Backend Auto-Start ===
+AUTO_START_BACKEND=true          # Auto-start backend when ComfyUI loads
+AUTO_RESTART_BACKEND=true        # Auto-restart on crash
+LOG_BACKEND_TO_FILE=true         # Log to backend/logs/server.log
+
 # === LLM Provider ===
 LLM_PROVIDER=openai              # openai, anthropic, or gemini
 LLM_MODEL=gpt-4-turbo-preview    # Model name
@@ -292,17 +350,20 @@ LOG_FORMAT=json                  # json or text
 
 ```
 FL_JS/
-├── __init__.py           # ComfyUI custom node registration
+├── __init__.py           # ComfyUI custom node registration + auto-start
 ├── backend/              # Python FastAPI server
 │   ├── __init__.py
 │   ├── server.py         # Main FastAPI app
+│   ├── server_runner.py  # 🆕 Subprocess manager
 │   ├── websocket.py      # WebSocket connection manager
 │   ├── config.py         # Configuration
 │   ├── models.py         # Pydantic models
 │   ├── agent.py          # PydanticAI agent (Phase 3)
 │   ├── mcp_server.py     # FastMCP tools (Phase 2)
 │   ├── callback_router.py # Tool callbacks (Phase 2)
-│   └── utils.py          # Utilities (Phase 3)
+│   ├── utils.py          # Utilities (Phase 3)
+│   └── logs/             # 🆕 Backend logs
+│       └── server.log    # Auto-generated
 │
 ├── web/                  # JavaScript extensions
 │   └── js/
@@ -327,7 +388,7 @@ FL_JS/
 │
 ├── notes/                # Documentation & plans
 │   ├── implementation/   # Implementation plans
-│   └── comfy_research/   # ComfyUI integration research
+│   └── comfy_init/       # 🆕 Auto-start research
 │
 ├── .env.example          # Environment template
 ├── requirements.txt      # Python dependencies
@@ -463,6 +524,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **FastMCP** - Model Context Protocol implementation
 - **Mermaid.js** - Beautiful diagram rendering
 - Original **FL_JS** - The foundation this builds upon
+- **ComfyUI-NODEJS** - Inspiration for auto-start implementation
 
 ---
 
@@ -480,6 +542,7 @@ See `notes/implementation/progress.md` for current status. Highlights:
 
 - ✅ **Phase 1**: Backend & frontend foundation (COMPLETE)
 - ✅ **Phase 1.5**: ComfyUI integration (COMPLETE)
+- ✅ **Phase 1.75**: Backend auto-start (COMPLETE)
 - 🚧 **Phase 2**: Tool system (40+ MCP tools)
 - 📋 **Phase 3**: Query DSL & agent
 - 📋 **Phase 4**: Chat UI & integration
@@ -497,6 +560,44 @@ See `notes/implementation/progress.md` for current status. Highlights:
 
 ## 🐛 Troubleshooting
 
+### Backend doesn't start automatically
+
+**Check ComfyUI console for errors:**
+
+```
+[FL_JS] Port 8000 already in use.
+```
+**Solution:** Change `WS_PORT` in `.env` or stop the conflicting service.
+
+```
+[FL_JS] Error: server.py not found
+```
+**Solution:** Reinstall or check file permissions.
+
+```
+[FL_JS] Backend server failed to start (timeout)
+```
+**Solution:** Check `backend/logs/server.log` for detailed errors.
+
+### Backend keeps restarting
+
+**Check logs:**
+```bash
+tail -f backend/logs/server.log
+```
+
+**Common causes:**
+- Missing API key in `.env`
+- Invalid model name
+- Port conflict
+- Missing dependencies
+
+**Disable auto-restart temporarily:**
+```bash
+# In .env
+AUTO_RESTART_BACKEND=false
+```
+
 ### Extension doesn't load
 
 **Check browser console (F12):**
@@ -507,10 +608,11 @@ See `notes/implementation/progress.md` for current status. Highlights:
 
 ### WebSocket connection fails
 
-**Check backend is running:**
+**Check backend status:**
 ```bash
-cd backend
-python server.py
+# Check if backend is running
+lsof -i :8000  # Linux/Mac
+netstat -ano | findstr :8000  # Windows
 ```
 
 **Check console for errors:**
@@ -530,17 +632,28 @@ localStorage.removeItem('fl_js_session_id');
 location.reload();
 ```
 
-### Backend server errors
+### Manual backend control
 
-**Check `.env` configuration:**
-- Verify API key is set
-- Verify provider matches key
-- Check model name is correct
-
-**Check logs:**
+**Stop auto-start:**
 ```bash
-# In backend directory
-tail -f server.log
+# In .env
+AUTO_START_BACKEND=false
+```
+
+**Find and kill backend process:**
+```bash
+# Linux/Mac
+lsof -i :8000
+kill <PID>
+
+# Windows
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+```
+
+**View backend logs:**
+```bash
+tail -f backend/logs/server.log
 ```
 
 ---
