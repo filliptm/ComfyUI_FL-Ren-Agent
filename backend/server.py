@@ -16,7 +16,6 @@ from backend.models import (
     Handshake,
     UserMessage,
     ToolResult,
-    Ping,
 )
 
 # Configure logging
@@ -197,10 +196,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             # Route message based on type
             msg_type = data.get("type")
             
-            if msg_type == "ping":
-                await handle_ping(session_id)
-            
-            elif msg_type == "user_message":
+            if msg_type == "user_message":
                 await handle_user_message(session_id, data)
             
             elif msg_type == "tool_result":
@@ -241,15 +237,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 
 # Message handlers
-
-async def handle_ping(session_id: str) -> None:
-    """Handle ping message.
-
-    Args:
-        session_id: Session ID
-    """
-    await manager.send_pong(session_id)
-
 
 async def handle_user_message(session_id: str, data: dict[str, Any]) -> None:
     """Handle user message.

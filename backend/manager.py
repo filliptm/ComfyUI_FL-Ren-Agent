@@ -7,7 +7,6 @@ import logging
 
 from models import (
     HandshakeAck,
-    Pong,
     ErrorMessage,
     SessionContext,
 )
@@ -110,18 +109,6 @@ class ConnectionManager:
             session_id=session_id,
             status="reconnected" if is_reconnect else "ready",
             agent_context=None,  # TODO: Add context if needed
-        )
-        await self.send_message(session_id, message.model_dump())
-
-    async def send_pong(self, session_id: str) -> None:
-        """Send pong response to ping.
-
-        Args:
-            session_id: Session ID
-        """
-        message = Pong(
-            session_id=session_id,
-            timestamp=datetime.now().isoformat(),
         )
         await self.send_message(session_id, message.model_dump())
 

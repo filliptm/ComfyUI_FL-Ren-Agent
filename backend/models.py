@@ -46,12 +46,6 @@ class ToolResult(BaseMessage):
     execution_time_ms: float = Field(..., description="Execution time in milliseconds")
 
 
-class Ping(BaseMessage):
-    """Heartbeat ping message."""
-
-    type: Literal["ping"] = "ping"
-
-
 # Server -> Client Messages
 
 class HandshakeAck(BaseMessage):
@@ -101,12 +95,6 @@ class ErrorMessage(BaseMessage):
     error_code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
     details: Optional[Any] = Field(None, description="Additional error details")
-
-
-class Pong(BaseMessage):
-    """Heartbeat pong response."""
-
-    type: Literal["pong"] = "pong"
 
 
 # ============================================================================

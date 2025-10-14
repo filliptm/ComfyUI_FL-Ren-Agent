@@ -1,16 +1,16 @@
 {
   "current_mode": "implementation",
   "project": "fl_js",
-  "task": "completed ChatUI DOM fix",
+  "task": "all 3 fixes implemented and documented",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "replaced all document.getElementById with this.container.querySelector",
+  "focus": "ready for testing",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "create backend directory structure and config files",
   "ui_integration": "app.extensionManager.registerSidebarTab",
   "reference_file": "legacy/NodePackLoader_SideBar.js",
   "progress_file": "notes/implementation/progress.md",
-  "phase": "4_complete",
+  "phase": "complete",
   "phase_progress": "100%",
   "next_files": [
     "frontend/session_manager.js",
@@ -19,7 +19,7 @@
   "next_phase": "Phase 2 - Tool System",
   "files_created": "chat_ui.js, diagram_generator.js, extension.js updated, server.py updated",
   "blocker": "need to understand ComfyUI initialization hooks",
-  "next_action": "await user approval to implement",
+  "next_action": "implement fixes in order: 1 (critical), 2 (stability), 3 (cleanup)",
   "overall_progress": "35%",
   "research_complete": "true",
   "decisions": {
@@ -36,12 +36,9 @@
     "dual logging (file + stdout)",
     "graceful shutdown"
   ],
-  "files_modified": [
-    "web/js/ws_client.js",
-    "web/js/extension.js"
-  ],
+  "files_modified": "web/js/ws_client.js, web/js/chat_ui.js, backend/server.py, backend/models.py, backend/manager.py",
   "phase_2_step": "complete",
-  "analysis_complete": "false",
+  "analysis_complete": "true",
   "files_completed": [
     "backend/callback_router.py",
     "web/js/fl_api.js",
@@ -57,5 +54,12 @@
     "notes/ws/investigation.md",
     "notes/ws/implementation.md"
   ],
-  "root_cause_hypothesis": "ChatUI._initializeUI() sets innerHTML but browser hasn't parsed/rendered it yet when _attachEventHandlers() tries to getElementById"
+  "root_cause_hypothesis": "ChatUI._initializeUI() sets innerHTML but browser hasn't parsed/rendered it yet when _attachEventHandlers() tries to getElementById",
+  "root_cause": "send() method checks handshakeComplete for ALL messages including handshake itself - circular dependency",
+  "confidence": "99% on circular dependency, 95% on ChatUI race, 100% on heartbeat removal",
+  "root_cause_1": "send() requires handshakeComplete for ALL messages including handshake itself",
+  "root_cause_2": "messagesContainer is null when _addWelcomeMessage runs - DOM timing issue",
+  "root_cause_3": "heartbeat adds unnecessary complexity and noise",
+  "implementation_plan": "notes/ws/implementation_fixes.md",
+  "fixes_applied": "1. Circular dependency fix in ws_client.js, 2. ChatUI race condition fix, 3. Heartbeat removal (frontend + backend)"
 }

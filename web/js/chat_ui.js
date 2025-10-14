@@ -99,8 +99,24 @@ export class ChatUI {
         // Add styles
         this._injectStyles();
         
-        // Add welcome message
-        this._addWelcomeMessage();
+        // ✅ FIX #2: Verify DOM is ready before adding welcome message
+        if (this.messagesContainer) {
+            // Add welcome message after a tick to ensure DOM is fully inserted
+            requestAnimationFrame(() => {
+                this._addWelcomeMessage();
+            });
+        } else {
+            console.error('[ChatUI] Failed to initialize: messagesContainer not found');
+            // Retry after delay
+            setTimeout(() => {
+                this.messagesContainer = this.container.querySelector('#fl-chat-messages');
+                if (this.messagesContainer) {
+                    this._addWelcomeMessage();
+                } else {
+                    console.error('[ChatUI] messagesContainer still not found after retry');
+                }
+            }, 100);
+        }
     }
 
     /**
@@ -577,6 +593,12 @@ export class ChatUI {
      * @private
      */
     async _renderMessage(message) {
+        // ✅ FIX #2: Safety check before rendering
+        if (!this.messagesContainer) {
+            console.error('[ChatUI] Cannot render message, messagesContainer not ready');
+            return;
+        }
+        
         const messageEl = document.createElement('div');
         messageEl.className = `fl-message ${message.role}`;
         

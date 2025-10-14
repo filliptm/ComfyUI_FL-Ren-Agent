@@ -4,7 +4,6 @@
  * Features:
  * - Session-based connection with handshake protocol
  * - Automatic reconnection with exponential backoff
- * - Heartbeat/ping-pong for connection monitoring
  * - Message queueing during disconnection
  * - Event-driven architecture for message handling
  */
@@ -45,7 +44,6 @@ class WSClient extends EventEmitter {
         // Configuration
         this.config = {
             url: config.url || 'ws://localhost:8000/ws',
-            heartbeatInterval: config.heartbeatInterval || 30000, // 30 seconds
             maxReconnectAttempts: config.maxReconnectAttempts || 5,
             initialReconnectDelay: config.initialReconnectDelay || 1000, // 1 second
             maxReconnectDelay: config.maxReconnectDelay || 30000, // 30 seconds
@@ -57,7 +55,6 @@ class WSClient extends EventEmitter {
         this.handshakeComplete = false;
         this.reconnectAttempts = 0;
         this.reconnectDelay = this.config.initialReconnectDelay;
-        this.heartbeatInterval = null;
         this.reconnectTimeout = null;
         this.messageQueue = [];
         
@@ -101,9 +98,6 @@ class WSClient extends EventEmitter {
         // Send handshake
         this.sendHandshake();
         
-        // Start heartbeat
-        this.startHeartbeat();
-        
         this.emit('connected');
     }
 
@@ -114,9 +108,6 @@ class WSClient extends EventEmitter {
         console.log('[WSClient] WebSocket disconnected:', event.code, event.reason);
         this.connected = false;
         this.handshakeComplete = false;
-        
-        // Stop heartbeat
-        this.stopHeartbeat();
         
         this.emit('disconnected', event);
         
@@ -169,11 +160,6 @@ class WSClient extends EventEmitter {
                     this.emit('error', message);
                     break;
                 
-                case 'pong':
-                    // Heartbeat response received
-                    console.log('[WSClient] Pong received');
-                    break;
-                
                 default:
                     console.warn('[WSClient] Unknown message type:', message.type);
             }
@@ -205,33 +191,6 @@ class WSClient extends EventEmitter {
         this.flushMessageQueue();
         
         this.emit('handshake_ack', message);
-    }
-
-    /**
-     * Start heartbeat interval
-     */
-    startHeartbeat() {
-        this.stopHeartbeat(); // Clear any existing interval
-        
-        this.heartbeatInterval = setInterval(() => {
-            if (this.connected && this.ws.readyState === WebSocket.OPEN) {
-                console.log('[WSClient] Sending ping');
-                this.send({
-                    type: 'ping',
-                    session_id: this.sessionId,
-                });
-            }
-        }, this.config.heartbeatInterval);
-    }
-
-    /**
-     * Stop heartbeat interval
-     */
-    stopHeartbeat() {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
-        }
     }
 
     /**
@@ -278,8 +237,13 @@ class WSClient extends EventEmitter {
             message.timestamp = new Date().toISOString();
         }
         
-        // Check if ready to send
-        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.handshakeComplete) {
+        // ✅ FIX #1: Allow handshake messages to bypass handshakeComplete check
+        const isHandshake = message.type === 'handshake';
+        const canSend = this.ws && 
+                        this.ws.readyState === WebSocket.OPEN && 
+                        (this.handshakeComplete || isHandshake);
+        
+        if (canSend) {
             try {
                 this.ws.send(JSON.stringify(message));
                 console.log('[WSClient] Sent message:', message.type);
@@ -341,9 +305,6 @@ class WSClient extends EventEmitter {
      */
     disconnect() {
         console.log('[WSClient] Disconnecting');
-        
-        // Stop heartbeat
-        this.stopHeartbeat();
         
         // Clear reconnect timeout
         if (this.reconnectTimeout) {
