@@ -9,9 +9,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from .websocket import manager
+from manager import manager
 from callback_router import CallbackRouter, current_session_id
-from .agent import agent_manager
+from agent import agent_manager
 from models import (
     Handshake,
     UserMessage,
