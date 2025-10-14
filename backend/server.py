@@ -247,7 +247,7 @@ async def handle_user_message(session_id: str, data: dict[str, Any]) -> None:
     """
     try:
         message = UserMessage(**data)
-        logger.info(f"User message from {session_id}: {message.content[:50]}...")
+        logger.info(f"User message from {session_id}: {message.message[:50]}...")
         
         # Set session context for tool callbacks
         current_session_id.set(session_id)
@@ -263,7 +263,7 @@ async def handle_user_message(session_id: str, data: dict[str, Any]) -> None:
         agent = agent_manager.get_agent(session_id)
         
         # Process message with agent
-        response = await agent.run(message.content)
+        response = await agent.run(message.message)
         
         # Send response
         await manager.send_message(session_id, {
