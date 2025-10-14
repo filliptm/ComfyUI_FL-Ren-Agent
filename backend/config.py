@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     log_backend_to_file: bool = True
 
     # LLM Provider Configuration
-    llm_provider: Literal["openai", "anthropic", "gemini"] = "openai"
+    llm_provider: Literal["openai", "anthropic", "gemini", "openrouter"] = "openai"
     llm_model: str = "gpt-4-turbo-preview"
     llm_temperature: float = 0.7
     llm_max_tokens: int = 32000
@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_api_key: str = ""
+    openrouter_api_key: str = ""
 
     # WebSocket Settings
     ws_host: str = "0.0.0.0"
@@ -73,6 +74,10 @@ class Settings(BaseSettings):
             if not self.google_api_key:
                 raise ValueError("GOOGLE_API_KEY not configured")
             return self.google_api_key
+        elif self.llm_provider == "openrouter":
+            if not self.openrouter_api_key:
+                raise ValueError("OPENROUTER_API_KEY not configured")
+            return self.openrouter_api_key
         else:
             raise ValueError(f"Unknown LLM provider: {self.llm_provider}")
 

@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Union
 from fastmcp import FastMCP
 from pydantic import Field
 
+from backend.models import WorkflowQuery
+
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP server
@@ -53,6 +55,102 @@ async def _execute_tool(tool_name: str, parameters: Dict[str, Any], timeout_ms: 
         parameters=parameters,
         timeout_ms=timeout_ms
     )
+
+
+# ============================================================================
+# QUERY & ANALYSIS TOOLS
+# ============================================================================
+
+@mcp.tool()
+async def query_workflow(query: WorkflowQuery) -> Dict[str, Any]:
+    """Query the workflow graph using structured filters, traversal, and aggregation.
+    
+    Supports filtering nodes by type, parameters, connections, etc.
+    Can traverse graph connections (upstream/downstream).
+    Can aggregate results (count, sum, avg, etc.).
+    Multiple result formats: full, summary, ids, scalar, diagram.
+    
+    Args:
+        query: WorkflowQuery object with filters, traversal, aggregation, etc.
+    
+    Returns:
+        Query results in requested format
+    
+    Example - Find all KSampler nodes:
+        >>> result = await query_workflow(WorkflowQuery(
+        ...     filters=FilterGroup(
+        ...         operator="and",
+        ...         filters=[Filter(field="type", operator="equals", value="KSampler")]
+        ...     )
+        ... ))
+    
+    Example - Count nodes:
+        >>> result = await query_workflow(WorkflowQuery(
+        ...     aggregation=Aggregation(type="count"),
+        ...     result_format="scalar"
+        ... ))
+    
+    Example - Get downstream nodes:
+        >>> result = await query_workflow(WorkflowQuery(
+        ...     filters=FilterGroup(
+        ...         operator="and",
+        ...         filters=[Filter(field="id", operator="equals", value=5)]
+        ...     ),
+        ...     traversal=Traversal(direction="downstream")
+        ... ))
+    """
+    return await _execute_tool("query_workflow", query.model_dump())
+
+
+@mcp.tool()
+async def workflow_overview() -> Dict[str, Any]:
+    """Get a comprehensive overview of the current workflow.
+    
+    Returns workflow statistics, node type counts, disconnected nodes,
+    and a Mermaid diagram of the entire workflow.
+    
+    Returns:
+        Dictionary with:
+        - total_nodes: Total number of nodes
+        - node_types: Count of each node type
+        - disconnected_nodes: List of nodes with no connections
+        - diagram: Mermaid diagram of workflow
+    
+    Example:
+        >>> result = await workflow_overview()
+        >>> print(f"Total nodes: {result['total_nodes']}")
+        >>> print(f"Disconnected: {len(result['disconnected_nodes'])}")
+        >>> print(result['diagram'])
+    """
+    return await _execute_tool("workflow_overview", {})
+
+
+@mcp.tool()
+async def workflow_diagram(
+    node_ids: Optional[List[int]] = Field(None, description="Optional list of node IDs to include (null for all nodes)")
+) -> Dict[str, Any]:
+    """Generate a Mermaid diagram of the workflow or subset of nodes.
+    
+    Creates a visual representation of the workflow graph showing nodes
+    and their connections.
+    
+    Args:
+        node_ids: Optional list of node IDs to include. If None, includes all nodes.
+    
+    Returns:
+        Dictionary with 'diagram' (Mermaid string) key
+    
+    Example:
+        >>> # Diagram of entire workflow
+        >>> result = await workflow_diagram()
+        >>> print(result['diagram'])
+        >>> 
+        >>> # Diagram of specific nodes
+        >>> result = await workflow_diagram(node_ids=[5, 7, 9, 12])
+    """
+    return await _execute_tool("workflow_diagram", {
+        "node_ids": node_ids
+    })
 
 
 # ============================================================================
@@ -852,4 +950,4 @@ async def random_choice(
 # SERVER LIFECYCLE
 # ============================================================================
 
-logger.info("MCP server initialized with 37 tools")
+logger.info("MCP server initialized with 40 tools")

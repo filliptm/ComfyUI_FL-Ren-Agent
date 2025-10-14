@@ -8,6 +8,7 @@
  */
 
 import { FL_API } from "./fl_api.js";
+import { QueryExecutor } from "./query_executor.js";
 
 /**
  * ToolExecutor class - Executes tools and manages execution history
@@ -16,6 +17,7 @@ export class ToolExecutor {
     constructor(wsClient) {
         this.wsClient = wsClient;
         this.flApi = new FL_API();
+        this.queryExecutor = new QueryExecutor();
         this.executionLog = [];
         this.maxLogEntries = 100;
         
@@ -31,6 +33,11 @@ export class ToolExecutor {
      */
     _registerHandlers() {
         return {
+            // Query & Analysis
+            "query_workflow": this._handleQueryWorkflow.bind(this),
+            "workflow_overview": this._handleWorkflowOverview.bind(this),
+            "workflow_diagram": this._handleWorkflowDiagram.bind(this),
+            
             // Node Management
             "find_node": this._handleFindNode.bind(this),
             "create_node": this._handleCreateNode.bind(this),
@@ -185,6 +192,30 @@ export class ToolExecutor {
     clearExecutionLog() {
         this.executionLog = [];
         console.log("[ToolExecutor] Execution log cleared");
+    }
+
+    // ==================== QUERY & ANALYSIS HANDLERS ====================
+
+    async _handleQueryWorkflow(params) {
+        return this.queryExecutor.execute(params);
+    }
+
+    async _handleWorkflowOverview(params) {
+        return this.queryExecutor.getWorkflowOverview();
+    }
+
+    async _handleWorkflowDiagram(params) {
+        const { node_ids } = params;
+        
+        if (node_ids) {
+            // Get specific nodes
+            const nodes = node_ids.map(id => this.queryExecutor.getNodeById(id)).filter(n => n !== null);
+            return { diagram: this.queryExecutor.generateDiagram(nodes) };
+        } else {
+            // Get all nodes
+            const nodes = this.queryExecutor.getAllNodes();
+            return { diagram: this.queryExecutor.generateDiagram(nodes) };
+        }
     }
 
     // ==================== NODE MANAGEMENT HANDLERS ====================
