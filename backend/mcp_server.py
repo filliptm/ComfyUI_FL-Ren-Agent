@@ -227,7 +227,7 @@ async def _execute_tool(ctx: Context, tool_name: str, parameters: Dict[str, Any]
     Raises:
         RuntimeError: If WebSocket client not initialized
     """
-    _ws_client = ctx.request_context.lifespan_context.client
+    _ws_client = ctx.request_context.lifespan_context['client']
     if _ws_client is None:
         raise RuntimeError("WebSocket client not initialized. MCP server not running in subprocess mode.")
     
