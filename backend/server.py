@@ -195,9 +195,25 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         while True:
             data = await websocket.receive_json()
             
-            # Validate session_id in message
+            # Get message type and session_id for logging
+            msg_type = data.get("type")
             msg_session_id = data.get("session_id")
+            
+            # DEBUG: Log all incoming messages with session_id info
+            logger.debug(
+                f"[VALIDATION] Received {msg_type} | "
+                f"msg_session_id={msg_session_id} | "
+                f"connection_session_id={session_id} | "
+                f"connection_type={connection_type}"
+            )
+            
+            # Validate session_id in message
             if msg_session_id != session_id:
+                logger.warning(
+                    f"[VALIDATION] Session mismatch! "
+                    f"msg_session_id={msg_session_id} != connection_session_id={session_id} | "
+                    f"msg_type={msg_type}"
+                )
                 await manager.send_error(
                     session_id,
                     "SESSION_MISMATCH",
@@ -207,8 +223,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 continue
             
             # Route message based on type
-            msg_type = data.get("type")
-            
             if msg_type == "user_message":
                 await handle_user_message(session_id, data)
             

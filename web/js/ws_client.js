@@ -248,6 +248,9 @@ class WSClient extends EventEmitter {
         
         if (canSend) {
             try {
+                // DEBUG: Log session_id before sending
+                console.log('[WSClient] 📤 About to send:', message.type, 'session_id:', message.session_id);
+                
                 this.ws.send(JSON.stringify(message));
                 console.log('[WSClient] Sent message:', message.type);
                 
@@ -298,6 +301,7 @@ class WSClient extends EventEmitter {
      * Send tool execution result
      */
     sendToolResult(requestId, success, data, error, executionTimeMs) {
+        console.log('[WSClient] 📤 Sending tool result:', requestId, 'session_id:', this.sessionId);
         this.send({
             type: 'tool_result',
             request_id: requestId,
