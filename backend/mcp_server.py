@@ -9,12 +9,12 @@ from typing import Any, Dict, List, Optional, Union
 from fastmcp import FastMCP
 from pydantic import Field
 
-from models import WorkflowQuery
+from backend.models import WorkflowQuery
 
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP server
-mcp = FastMCP("FL_JS Workflow Tools")
+mcp = FastMCP("FL_Agent Workflow Tools")
 
 # Import callback router functions (will be set during server initialization)
 _callback_router = None
@@ -946,8 +946,9 @@ async def random_choice(
     })
 
 
-# ============================================================================
-# SERVER LIFECYCLE
-# ============================================================================
-
-logger.info("MCP server initialized with 40 tools")
+def main():
+    """Run the MCP server as a standalone application."""
+    mcp.run()
+    
+if __name__ == "__main__":
+    main()
