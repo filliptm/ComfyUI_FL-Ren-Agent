@@ -17,7 +17,7 @@ from fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field
 
 from models import WorkflowQuery
-from .comfy_models import (
+from comfy_models import (
     ComfyListFoldersRequest, ComfyListFoldersResponse,
     ComfyReadFileRequest, ComfyReadFileResponse,
     ComfySearchFilesRequest, ComfySearchFilesResponse
