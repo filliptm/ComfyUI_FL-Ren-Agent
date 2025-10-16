@@ -230,7 +230,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             
             # Route message based on type
             if msg_type == "user_message":
-                await handle_user_message(session_id, data)
+                # await handle_user_message(session_id, data)
+                asyncio.create_task(handle_user_message(session_id, data))
             
             elif msg_type == "tool_result":
                 await handle_tool_result(session_id, data)

@@ -1,10 +1,10 @@
 {
-  "current_mode": "implementation",
+  "current_mode": "debugging",
   "project": "fl_js",
-  "task": "added trace logging - ready for testing",
+  "task": "clarifying the actual problem",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "backend/server.py and web/js/ws_client.js",
+  "focus": "checking if tool_result or tool_request can block",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "user will test and check logs",
   "ui_integration": "app.extensionManager.registerSidebarTab",
@@ -22,7 +22,7 @@
     "tests/agent.py"
   ],
   "blocker": "need to understand ComfyUI initialization hooks",
-  "next_action": "add logging at WebSocket entry points",
+  "next_action": "present findings and await confirmation before implementing",
   "overall_progress": "35%",
   "research_complete": "true",
   "decisions": {
@@ -58,8 +58,8 @@
     "notes/ws/implementation.md"
   ],
   "root_cause_hypothesis": "ChatUI._initializeUI() sets innerHTML but browser hasn't parsed/rendered it yet when _attachEventHandlers() tries to getElementById",
-  "root_cause": "web/js/ws_client.js sendToolResult() missing session_id field",
-  "confidence": "85% - need to trace exact path",
+  "root_cause": "blocking await prevents loop from receiving tool_result",
+  "confidence": "95% - clear evidence in logs",
   "root_cause_1": "send() requires handshakeComplete for ALL messages including handshake itself",
   "root_cause_2": "messagesContainer is null when _addWelcomeMessage runs - DOM timing issue",
   "root_cause_3": "heartbeat adds unnecessary complexity and noise",
@@ -77,8 +77,8 @@
   "last_note": "notes/message_processing/analysis.md",
   "fix_status": "user already implemented",
   "problem": "tool_result not reaching MCP subprocess",
-  "evidence": "backend.log shows tool_result arrives but MCP times out",
-  "hypothesis": "send_message() returning True but message not actually sent OR frontend not listening",
+  "evidence": "frontend: 2fb936e8-ef7c... | backend expects: 60ae9f3d-6a44...",
+  "hypothesis": "manager might be routing to wrong connection",
   "key_finding": "backend says '\u2705 successfully forwarded' but frontend log shows NO tool_request received",
   "missing_log": "no [SEND] debug logs from manager.send_message",
   "fix_applied": "added LOG_LEVEL=DEBUG to .env",
@@ -87,6 +87,11 @@
   "awaiting_user_confirmation": "false",
   "hypothesis_revised": "session_id auto-injection exists but might have mismatch or not working",
   "changes": "added message loop entry/exit logging, changed DEBUG to INFO",
-  "discovery": "tool_result arrives at backend but doesn't reach message loop",
-  "problem_location": "between WebSocket receive and message routing"
+  "discovery": "frontend loop blocks in handle_user_message awaiting agent.run()",
+  "problem_location": "between WebSocket receive and message routing",
+  "question": "are frontend and MCP using same connection or separate?",
+  "solution": "use asyncio.create_task() to make handlers non-blocking",
+  "analysis_stage": "reviewing handler implementations",
+  "confusion": "thought we found deadlock but logs show MCP loop IS waiting",
+  "need": "clear determination of what the actual problem is"
 }
