@@ -1,10 +1,10 @@
 {
-  "current_mode": "implementation",
+  "current_mode": "research",
   "project": "fl_js",
-  "task": "completed canvas refresh fix",
+  "task": "completed extended tools research",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "fix UI update issue for batch operations",
+  "focus": "feasibility research and proposal creation",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "user will test and check logs",
   "ui_integration": "app.extensionManager.registerSidebarTab",
@@ -16,7 +16,7 @@
     "frontend/session_manager.js",
     "frontend/ws_client.js"
   ],
-  "next_phase": "Phase 2 - Tool System",
+  "next_phase": "ready for Phase 1 implementation",
   "files_created": [
     "agents/mcptest.md",
     "tests/agent.py"
@@ -79,7 +79,7 @@
   "problem": "tool_result not reaching MCP subprocess",
   "evidence": "frontend: 2fb936e8-ef7c... | backend expects: 60ae9f3d-6a44...",
   "hypothesis": "manager might be routing to wrong connection",
-  "key_finding": "backend says '\u2705 successfully forwarded' but frontend log shows NO tool_request received",
+  "key_finding": "all proposed tools are technically feasible",
   "missing_log": "no [SEND] debug logs from manager.send_message",
   "fix_applied": "added _refreshCanvas() helper and calls to all layout methods",
   "analysis_checkpoint": "MUST confirm routing logic before proposing solution",
@@ -99,5 +99,6 @@
   "working_status": "backend fixed - tools working",
   "new_issue": "UI layout changes not reflecting until mouse interaction",
   "investigation_area": "legacy/ code for UI refresh patterns",
-  "expected_result": "batch layout operations now update UI immediately"
+  "expected_result": "batch layout operations now update UI immediately",
+  "deliverables": "proposal.md and research.md in notes/extended_tools/"
 }

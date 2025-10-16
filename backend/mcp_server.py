@@ -693,11 +693,11 @@ async def random_choice(request: RandomChoiceRequest, ctx: Context) -> Dict[str,
 
 # Other Ideas
 #   Meta-Awareness: Awareness of the full environment including installed plugins (this is through python I'm assuming!)
-#   Workspace awareness: what tabs do you have? can we switch workflow tabs? etc.
+#   Workspace awareness: what tabs do you have? can we switch workflow tabs? etc. (from frontend then executed tools through here?)
 #   Workflow awareness: list workflows, find workflows? or like rather, be pointed at a folder or workflow to load? loading, etc. stuff that's in the file menu?
+#   Node Search and Node Finding: What is already possible through comfy lib? It'd be nice to have tools for find_installed_node that lets us search over all nodes names, descriptions, etc.
 
 def main():
-    """Run the MCP server as a standalone application."""
     mcp.run()
     
 if __name__ == "__main__":

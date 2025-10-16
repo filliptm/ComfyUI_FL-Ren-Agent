@@ -1,9 +1,10 @@
 """FastAPI server with WebSocket endpoint for FL_JS Agentic System."""
 
 import asyncio
+import copy
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -231,7 +232,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             # Route message based on type
             if msg_type == "user_message":
                 # await handle_user_message(session_id, data)
-                asyncio.create_task(handle_user_message(session_id, data))
+                asyncio.create_task(handle_user_message(session_id, data, message_history=context.conversation_history))
             
             elif msg_type == "tool_result":
                 await handle_tool_result(session_id, data)
@@ -276,9 +277,265 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             pass
 
 
+# Function to filter message history
+from pydantic_ai.messages import ModelMessage, SystemPromptPart, UserPromptPart, TextPart, ToolCallPart, ToolReturnPart, RetryPromptPart
+from pydantic_ai.agent import AgentRunResult
+
+# Helper function to truncate text with marker
+def truncate_text(text: str, max_chars: int) -> str:
+    """Truncate text to max_chars length with a truncation marker."""
+    if not text or len(text) <= max_chars:
+        return text
+    
+    truncation_marker = "...<truncated>"
+    return text[:max_chars - len(truncation_marker)] + truncation_marker
+
+# Helper function to recursively truncate strings in a nested structure
+def truncate_nested_strings(obj: Any, max_chars: int) -> Any:
+    """Recursively truncate all string values in a nested structure."""
+    if isinstance(obj, str):
+        return truncate_text(obj, max_chars)
+    elif isinstance(obj, dict):
+        return {k: truncate_nested_strings(v, max_chars) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [truncate_nested_strings(item, max_chars) for item in obj]
+    else:
+        return obj
+
+def filtered_message_history(
+    messages: List[ModelMessage], 
+    limit: Optional[int] = 36, 
+    include_tool_messages: bool = False,
+    max_chars: int = 2000
+) -> Optional[List[Dict[str, Any]]]:
+    """
+    Filter and limit the message history from an AgentRunResult.
+    
+    Args:
+        result: The AgentRunResult object with message history
+        limit: Optional int, if provided returns only system message + last N messages
+        include_tool_messages: Whether to include tool messages in the history
+        max_chars: Maximum number of characters for string values in tool calls and returns (default: 2000)
+        
+    Returns:
+        Filtered list of messages in the format expected by the agent
+    """
+    # if result is None:
+    #     return None
+        
+    # # Get all messages
+    # messages: list[ModelMessage] = result.all_messages()
+    
+    # Extract system message (always the first one with role="system")
+    system_message = next((msg for msg in messages if type(msg.parts[0]) == SystemPromptPart), None)
+    
+    # Filter non-system messages
+    non_system_messages = [msg for msg in messages if type(msg.parts[0]) != SystemPromptPart]
+    
+    # Apply tool message filtering if requested
+    if not include_tool_messages:
+        non_system_messages = [msg for msg in non_system_messages if not any(isinstance(part, ToolCallPart) or isinstance(part, ToolReturnPart) for part in msg.parts)]
+    
+    # Find the most recent UserPromptPart before applying limit
+    latest_user_prompt_part = None
+    latest_user_prompt_index = -1
+    for i, msg in enumerate(non_system_messages):
+        for part in msg.parts:
+            if isinstance(part, UserPromptPart):
+                latest_user_prompt_part = part
+                latest_user_prompt_index = i
+    
+    # Apply limit if specified, but ensure paired tool calls and returns stay together
+    if limit is not None and limit > 0:
+        # Build comprehensive mapping of tool calls and returns
+        tool_call_to_msg = {}  # tool_call_id -> message_index
+        tool_return_to_msg = {}  # tool_call_id -> message_index
+        
+        for i, msg in enumerate(non_system_messages):
+            for part in msg.parts:
+                if isinstance(part, ToolCallPart):
+                    tool_call_to_msg[part.tool_call_id] = i
+                elif isinstance(part, ToolReturnPart):
+                    tool_return_to_msg[part.tool_call_id] = i
+                elif isinstance(part, RetryPromptPart):
+                    # RetryPromptPart acts like a ToolReturnPart for mapping purposes
+                    tool_return_to_msg[part.tool_call_id] = i
+        
+        # Take the last 'limit' messages but ensure we include paired messages
+        if len(non_system_messages) > limit:
+            # Start with the basic window
+            included_indices = set(range(len(non_system_messages) - limit, len(non_system_messages)))
+            
+            # BIDIRECTIONAL pairing: ensure both calls and returns are included together
+            # We iterate until no new indices are added to guarantee completeness
+            changes_made = True
+            iteration_count = 0
+            max_iterations = len(non_system_messages)  # Safety limit
+            
+            while changes_made and iteration_count < max_iterations:
+                changes_made = False
+                original_size = len(included_indices)
+                iteration_count += 1
+                
+                # Create a copy to iterate over (avoid modifying set during iteration)
+                current_indices = set(included_indices)
+                
+                for msg_idx in current_indices:
+                    if msg_idx >= len(non_system_messages):  # Safety check
+                        continue
+                        
+                    msg = non_system_messages[msg_idx]
+                    for part in msg.parts:
+                        if isinstance(part, ToolCallPart):
+                            # If we have a tool call, ensure its return is included
+                            if part.tool_call_id in tool_return_to_msg:
+                                return_msg_idx = tool_return_to_msg[part.tool_call_id]
+                                if return_msg_idx not in included_indices:
+                                    included_indices.add(return_msg_idx)
+                                    
+                        elif isinstance(part, ToolReturnPart):
+                            # If we have a tool return, ensure its call is included
+                            if part.tool_call_id in tool_call_to_msg:
+                                call_msg_idx = tool_call_to_msg[part.tool_call_id]
+                                if call_msg_idx not in included_indices:
+                                    included_indices.add(call_msg_idx)
+                        elif isinstance(part, RetryPromptPart):
+                            # If we have a retry prompt, ensure its call is included
+                            if part.tool_call_id in tool_call_to_msg:
+                                call_msg_idx = tool_call_to_msg[part.tool_call_id]
+                                if call_msg_idx not in included_indices:
+                                    included_indices.add(call_msg_idx)
+                
+                # Check if we added any new indices
+                if len(included_indices) > original_size:
+                    changes_made = True
+            
+            # Safety check: if we hit max iterations, log a warning
+            if iteration_count >= max_iterations:
+                logger.warning(f"Tool pairing reached max iterations ({max_iterations}). Some tool calls/returns may be unpaired.")
+            
+            # VALIDATION STEP: After the bidirectional pairing loop, validate completeness
+            # Remove any orphaned tool calls or returns from the included messages
+            validated_indices: Set[int] = set()
+            orphaned_calls: Set[str] = set()
+            orphaned_returns: Set[str] = set()
+            
+            for msg_idx in sorted(included_indices):
+                if msg_idx >= len(non_system_messages):  # Safety check
+                    continue
+                    
+                msg = non_system_messages[msg_idx]
+                has_orphaned_parts = False
+                
+                for part in msg.parts:
+                    if isinstance(part, ToolCallPart):
+                        # Check if return exists in included messages
+                        if part.tool_call_id in tool_return_to_msg:
+                            return_idx = tool_return_to_msg[part.tool_call_id]
+                            if return_idx not in included_indices:
+                                has_orphaned_parts = True
+                                orphaned_calls.add(part.tool_call_id)
+                        else:
+                            # If we don't have a return at all for this call
+                            has_orphaned_parts = True
+                            orphaned_calls.add(part.tool_call_id)
+                            
+                    elif isinstance(part, ToolReturnPart) or isinstance(part, RetryPromptPart):
+                        # Check if call exists in included messages
+                        if part.tool_call_id in tool_call_to_msg:
+                            call_idx = tool_call_to_msg[part.tool_call_id]
+                            if call_idx not in included_indices:
+                                has_orphaned_parts = True
+                                orphaned_returns.add(part.tool_call_id)
+                        else:
+                            # If we don't have a call at all for this return
+                            has_orphaned_parts = True
+                            orphaned_returns.add(part.tool_call_id)
+                
+                # Only include message if no orphaned parts
+                if not has_orphaned_parts:
+                    validated_indices.add(msg_idx)
+            
+            # Log any orphaned tool calls for debugging
+            if orphaned_calls or orphaned_returns:
+                logger.warning(f"Excluded messages with orphaned tool calls: {orphaned_calls}, returns: {orphaned_returns}")
+            
+            # Use validated indices instead of included_indices
+            # IMPORTANT: Sort indices to maintain chronological order
+            sorted_indices = sorted(validated_indices)
+            non_system_messages = [non_system_messages[i] for i in sorted_indices]
+            
+            # Handle the latest user prompt preservation logic
+            if (latest_user_prompt_index >= 0 and 
+                latest_user_prompt_index not in validated_indices and 
+                latest_user_prompt_part is not None and 
+                system_message is not None):
+                # Find if system_message already has a UserPromptPart
+                user_prompt_index = next((i for i, part in enumerate(system_message.parts) 
+                                       if isinstance(part, UserPromptPart)), None)
+                
+                if user_prompt_index is not None:
+                    # Replace existing UserPromptPart
+                    system_message.parts[user_prompt_index] = latest_user_prompt_part
+                else:
+                    # Add new UserPromptPart to system message
+                    system_message.parts.append(latest_user_prompt_part)
+    
+    # Apply string truncation to tool calls and returns
+    if max_chars > 0:
+        # Create deep copies to avoid modifying original messages
+        truncated_system_message = copy.deepcopy(system_message) if system_message else None
+        truncated_non_system_messages = [copy.deepcopy(msg) for msg in non_system_messages]
+        
+        # Process system message if it exists
+        if truncated_system_message:
+            for part in truncated_system_message.parts:
+                # We don't truncate system or user prompt parts to preserve core instructions
+                if isinstance(part, ToolCallPart):
+                    # Truncate parameters in tool calls
+                    if hasattr(part, 'parameters') and part.parameters:
+                        part.parameters = truncate_nested_strings(part.parameters, max_chars)
+                elif isinstance(part, ToolReturnPart):
+                    # Truncate content in tool returns
+                    if hasattr(part, 'content') and part.content:
+                        part.content = truncate_nested_strings(part.content, max_chars)
+        
+        # Process non-system messages
+        for msg in truncated_non_system_messages:
+            for part in msg.parts:
+                if isinstance(part, TextPart):
+                    # Truncate text content (usually assistant or user regular messages)
+                    if hasattr(part, 'text') and part.text:
+                        part.text = truncate_text(part.text, max_chars)
+                elif isinstance(part, ToolCallPart):
+                    # Truncate parameters in tool calls
+                    if hasattr(part, 'parameters') and part.parameters:
+                        part.parameters = truncate_nested_strings(part.parameters, max_chars)
+                elif isinstance(part, ToolReturnPart):
+                    # Truncate content in tool returns
+                    if hasattr(part, 'content') and part.content:
+                        part.content = truncate_nested_strings(part.content, max_chars)
+                elif isinstance(part, RetryPromptPart):
+                    # Also truncate retry prompts content
+                    if hasattr(part, 'content') and part.content:
+                        part.content = truncate_nested_strings(part.content, max_chars)
+        
+        # Use the truncated messages for result
+        system_message = truncated_system_message
+        non_system_messages = truncated_non_system_messages
+    
+    # Combine system message with other messages
+    result_messages = []
+    if system_message:
+        result_messages.append(system_message)
+    result_messages.extend(non_system_messages)
+        
+    return result_messages
+
+
 # Message handlers
 
-async def handle_user_message(session_id: str, data: dict[str, Any]) -> None:
+async def handle_user_message(session_id: str, data: dict[str, Any], message_history:List[ModelMessage]) -> None:
     """Handle user message.
 
     Args:
@@ -305,9 +562,13 @@ async def handle_user_message(session_id: str, data: dict[str, Any]) -> None:
         response = None
         async with agent.run_mcp_servers(): 
             # Process message with agent
-            response = await agent.run(message.message) # TODO set this to use message history for this session
+            response = await agent.run(message.message, message_history=filtered_message_history(message_history, include_tool_messages=True)) # TODO set this to use message history for this session
         
         if response is not None:
+            # Set History (Mutable)
+            message_history.clear()
+            message_history.extend(response.all_messages())
+            
             # Send response
             await manager.send_message(session_id, {
                 "type": "agent_response",
