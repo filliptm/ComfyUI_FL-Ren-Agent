@@ -193,14 +193,20 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         
         # Message loop
         while True:
+            # 🔍 TRACE: Log before receive
+            logger.info(f"[TRACE] 📥 Waiting for message on session {session_id} ({connection_type})")
+            
             data = await websocket.receive_json()
+            
+            # 🔍 TRACE: Log what we received
+            logger.info(f"[TRACE] 📦 Received message on session {session_id} ({connection_type}): type={data.get('type')}")
             
             # Get message type and session_id for logging
             msg_type = data.get("type")
             msg_session_id = data.get("session_id")
             
-            # DEBUG: Log all incoming messages with session_id info
-            logger.debug(
+            # Log all incoming messages with session_id info (changed from DEBUG to INFO)
+            logger.info(
                 f"[VALIDATION] Received {msg_type} | "
                 f"msg_session_id={msg_session_id} | "
                 f"connection_session_id={session_id} | "
