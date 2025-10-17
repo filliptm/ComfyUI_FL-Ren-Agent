@@ -51,7 +51,13 @@ export class ChatUI {
     _initializeUI() {
         // Clear container
         this.container.innerHTML = '';
-        
+
+        // Ensure the parent container doesn't scroll
+        this.container.style.overflow = 'hidden';
+        this.container.style.height = '100%';
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
+
         // Create main layout
         const layout = document.createElement('div');
         layout.className = 'fl-chat-layout';
@@ -71,9 +77,9 @@ export class ChatUI {
                 <span class="fl-typing-text">Assistant is thinking...</span>
             </div>
             <div class="fl-chat-input-container">
-                <textarea 
-                    class="fl-chat-input" 
-                    id="fl-chat-input" 
+                <textarea
+                    class="fl-chat-input"
+                    id="fl-chat-input"
                     placeholder="Ask me anything about your workflow..."
                     rows="1"
                 ></textarea>
@@ -85,7 +91,7 @@ export class ChatUI {
                 </button>
             </div>
         `;
-        
+
         this.container.appendChild(layout);
         
         // Store references using querySelector on container
@@ -137,6 +143,7 @@ export class ChatUI {
                 background: var(--bg-color, #1e1e1e);
                 color: var(--fg-color, #e0e0e0);
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                overflow: hidden; /* Prevent layout itself from scrolling */
             }
 
             /* Header */
@@ -146,7 +153,8 @@ export class ChatUI {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                flex-shrink: 0;
+                flex-shrink: 0; /* Keep header fixed at top */
+                background: var(--bg-color, #1e1e1e); /* Ensure header has background */
             }
 
             .fl-chat-title {
@@ -190,12 +198,14 @@ export class ChatUI {
 
             /* Messages Container */
             .fl-chat-messages {
-                flex: 1;
-                overflow-y: auto;
+                flex: 1; /* Take up remaining space */
+                overflow-y: auto; /* Only messages scroll */
+                overflow-x: hidden; /* Prevent horizontal scroll */
                 padding: 16px;
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
+                min-height: 0; /* Critical for flex scroll to work */
             }
 
             .fl-chat-messages::-webkit-scrollbar {
@@ -414,7 +424,9 @@ export class ChatUI {
                 gap: 8px;
                 font-size: 12px;
                 opacity: 0.7;
-                flex-shrink: 0;
+                flex-shrink: 0; /* Keep typing indicator fixed */
+                background: var(--bg-color, #1e1e1e); /* Ensure background */
+                border-top: 1px solid var(--border-color, #333);
             }
 
             .fl-typing-indicator {
@@ -454,7 +466,8 @@ export class ChatUI {
                 display: flex;
                 gap: 8px;
                 align-items: flex-end;
-                flex-shrink: 0;
+                flex-shrink: 0; /* Keep input fixed at bottom */
+                background: var(--bg-color, #1e1e1e); /* Ensure background */
             }
 
             .fl-chat-input {
