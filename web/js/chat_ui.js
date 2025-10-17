@@ -512,7 +512,31 @@ export class ChatUI {
      * @private
      */
     _addWelcomeMessage() {
-        const welcomeText = `👋 **Welcome to FL_JS Assistant!**\n\nI can help you with:\n- Creating and modifying nodes\n- Querying your workflow\n- Connecting nodes\n- Adjusting layouts\n- Running workflows\n\nJust ask me anything!`;
+        const welcomeText = `👋 **Welcome to FL_JS Assistant!**
+
+I'm your ComfyUI workflow automation agent. I can help you with:
+
+**Workflow Management:**
+- 🎨 Creating and modifying nodes
+- 🔗 Connecting nodes and building pipelines
+- 📐 Querying and analyzing your workflow
+- 🎯 Adjusting layouts and organization
+- ▶️ Running and executing workflows
+
+**ComfyUI Discovery:**
+- 🔍 Finding installed custom nodes and plugins
+- 📚 Reading node documentation and source code
+- 🧩 Discovering node capabilities and interfaces
+- 📦 Listing available models (checkpoints, LoRAs, VAE, etc.)
+- 🔎 Searching for specific functionality
+
+**Smart Assistance:**
+- 💡 Recommending nodes for your tasks
+- 🛠️ Understanding node parameters and types
+- 🎓 Explaining ComfyUI concepts and workflows
+- 🚀 Optimizing workflow performance
+
+Just ask me anything! I have deep access to your ComfyUI installation.`;
         
         this.addMessage('system', welcomeText, 'assistant');
     }

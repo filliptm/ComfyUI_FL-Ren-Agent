@@ -4,10 +4,12 @@ import asyncio
 import copy
 import logging
 from contextlib import asynccontextmanager
+import traceback
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic_ai import UnexpectedModelBehavior
 
 from backend.config import settings
 from manager import manager
@@ -579,6 +581,16 @@ async def handle_user_message(session_id: str, data: dict[str, Any], message_his
             })
             
             logger.info(f"Agent response sent to {session_id}")
+    except UnexpectedModelBehavior as ue:
+        # Happens mainly when a model can't get a tool call right after so many tries
+
+        # Extract root cause error
+        root_cause = ue.__cause__ if ue.__cause__ else ue
+        root_cause_msg = str(root_cause)
+        
+        trback = traceback.format_exception(type(root_cause), root_cause, root_cause.__traceback__)
+
+        logger.critical(f"Critical Tool Error: {root_cause_msg}\n\nTraceback:\n{trback}")
     
     except Exception as e:
         logger.error(f"Error handling user message: {e}", exc_info=True)
