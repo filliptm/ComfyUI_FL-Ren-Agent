@@ -361,6 +361,13 @@ class GetNodeRectRequest(BaseModel):
     """Request to get node position and size."""
     node_id: Union[int, str] = Field(..., description="Node ID or title")
 
+class GetLayoutRequest(BaseModel):
+    """Request to get layout for all nodes or specific nodes."""
+    node_ids: Optional[List[Union[int, str]]] = Field(
+        None, 
+        description="Optional list of node IDs or titles to get rects for (omit for all nodes)"
+    )
+
 class SetNodeRectRequest(BaseModel):
     """Request to set node position and/or size."""
     node_id: Union[int, str] = Field(..., description="Node ID or title")
@@ -815,6 +822,41 @@ async def auto_connect_workflow(request: AutoConnectWorkflowRequest, ctx: Contex
 async def get_node_rect(request: GetNodeRectRequest, ctx: Context) -> Dict[str, Any]:
     """Get node position and size."""
     return await _execute_tool(ctx, "get_node_rect", request.model_dump())
+
+
+@mcp.tool()
+async def get_layout(request: GetLayoutRequest, ctx: Context) -> Dict[str, Any]:
+    """Get position and size for all nodes (or specified nodes) in the workflow.
+    
+    This tool retrieves layout information for the entire workflow at once, which is
+    significantly more efficient than calling get_node_rect() multiple times.
+    
+    Useful for:
+    - Understanding overall workflow spatial organization
+    - Calculating new layouts before applying them with modify_layout
+    - Detecting overlaps or spacing issues across the workflow
+    - Exporting workflow layout data
+    - Analyzing workflow structure and density
+    
+    Args:
+        request: GetLayoutRequest with optional node_ids filter
+    
+    Returns:
+        {
+            "nodes": [
+                {
+                    "node_id": int,
+                    "title": str,
+                    "type": str,
+                    "rect": {"x": float, "y": float, "width": float, "height": float}
+                },
+                ...
+            ],
+            "count": int
+        }
+        
+    """
+    return await _execute_tool(ctx, "get_layout", request.model_dump())
 
 
 @mcp.tool()
