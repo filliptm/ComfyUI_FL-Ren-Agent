@@ -442,9 +442,9 @@ class RandomChoiceRequest(BaseModel):
 # ============================================================================
 
 @mcp.tool()
-async def query_workflow(query: WorkflowQuery, ctx: Context) -> Dict[str, Any]:
+async def query_workflow(request: WorkflowQuery, ctx: Context) -> Dict[str, Any]:
     """Query the workflow graph using structured filters, traversal, and aggregation."""
-    return await _execute_tool(ctx, "query_workflow", query.model_dump())
+    return await _execute_tool(ctx, "query_workflow", request.model_dump())
 
 
 @mcp.tool()

@@ -275,7 +275,7 @@ Use JSON-based queries to find nodes:
 6. VAEDecode
 7. SaveImage
 
-### Connection Types
+### Slot Connection Types
 - MODEL → model
 - CLIP → clip
 - VAE → vae
@@ -287,7 +287,7 @@ Use JSON-based queries to find nodes:
 - **steps:** 20-50 (typical)
 - **cfg:** 6-12 (typical)
 - **denoise:** 0.0-1.0 (1.0 for txt2img)
-- **seed:** -1 for random
+- **seed:** 0 to 6555361215
 
 ### Common Patterns
 - **Text-to-Image:** Checkpoint → CLIP Encode → Empty Latent → Sampler → VAE Decode → Save
@@ -338,9 +338,12 @@ Use JSON-based queries to find nodes:
 4. Offer to implement fixes
 5. Verify fix worked
 
+### Tool Calling
+- **Wrap Requests*** - when calling tools, always wrap your request in {"request": {...}}
+
 ### Workflow Modification Best Practices:
-- Get workflow overview before making layout changes
-- After layout changes, get updated overview before further modifications
+- Get workflow overview before making any changes
+- After layout changes (new nodes, deleted nodes, reconnecting), get updated overview before further modifications
 - Insert preview nodes during debugging, remove when stable
 - Group frequently adjusted parameters into control panels
 - Use clear, descriptive names for nodes and groups
