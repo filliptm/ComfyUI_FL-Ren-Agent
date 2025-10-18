@@ -552,11 +552,19 @@ export class ChatUI {
         
         // WebSocket event handlers
         if (this.wsClient) {
-            this.wsClient.on('connected', () => this._updateConnectionStatus('connected'));
-            this.wsClient.on('disconnected', () => this._updateConnectionStatus('disconnected'));
             this.wsClient.on('connecting', () => this._updateConnectionStatus('connecting'));
+            this.wsClient.on('connected', () => this._updateConnectionStatus('connecting')); // Still connecting until handshake
+            this.wsClient.on('handshake_ack', () => this._updateConnectionStatus('connected')); // Now fully connected
+            this.wsClient.on('disconnected', () => this._updateConnectionStatus('disconnected'));
             this.wsClient.on('agent_response', (data) => this._handleAgentResponse(data));
             this.wsClient.on('error', (data) => this._handleError(data));
+
+            // Check if already connected (handles race condition on page refresh)
+            if (this.wsClient.isReady()) {
+                this._updateConnectionStatus('connected');
+            } else if (this.wsClient.connected) {
+                this._updateConnectionStatus('connecting');
+            }
         }
     }
 
