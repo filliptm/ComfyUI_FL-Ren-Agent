@@ -63,7 +63,7 @@ export class ChatUI {
         layout.className = 'fl-chat-layout';
         layout.innerHTML = `
             <div class="fl-chat-header">
-                <div class="fl-chat-title">FL Agent</div>
+                <div class="fl-chat-title">Ren</div>
                 <div class="fl-chat-status">
                     <span class="fl-status-indicator" id="fl-status-indicator"></span>
                     <span class="fl-status-text" id="fl-status-text">Connecting...</span>
@@ -74,7 +74,7 @@ export class ChatUI {
                 <span class="fl-typing-indicator">
                     <span></span><span></span><span></span>
                 </span>
-                <span class="fl-typing-text">Assistant is thinking...</span>
+                <span class="fl-typing-text">Assistant is working...</span>
             </div>
             <div class="fl-chat-input-container">
                 <textarea
