@@ -298,6 +298,10 @@ class SelectNodesRequest(BaseModel):
     """Request to select nodes."""
     node_ids: List[Union[int, str]] = Field(..., description="List of node IDs or titles to select")
 
+class GetSelectedNodesRequest(BaseModel):
+    """Request to get currently selected nodes."""
+    pass
+
 # Node Manipulation
 class GetNodeValuesRequest(BaseModel):
     """Request to get node parameter values."""
@@ -511,6 +515,49 @@ async def unpin_nodes(request: UnpinNodesRequest, ctx: Context) -> Dict[str, Any
 async def select_nodes(request: SelectNodesRequest, ctx: Context) -> Dict[str, Any]:
     """Select one or more nodes in the UI."""
     return await _execute_tool(ctx, "select_nodes", request.model_dump())
+
+
+@mcp.tool()
+async def get_current_user_focus(request: GetSelectedNodesRequest, ctx: Context) -> Dict[str, Any]:
+    """Get currently selected nodes in ComfyUI to understand user's current focus.
+    
+    This tool provides context-aware assistance by returning detailed information
+    about the nodes the user currently has selected in the workflow canvas.
+    
+    USE CASES:
+    - User asks "what does this node do?" - Check selected nodes for context
+    - User says "change the seed" - Find seed parameter in selected nodes
+    - User requests modifications - Know which nodes they're referring to
+    - Debugging assistance - Analyze parameters of nodes user is examining
+    
+    RETURNS:
+    Dictionary with 'nodes' key containing array of selected node objects.
+    Each node includes:
+    - id: Node ID (integer)
+    - title: Node title (string)
+    - type: Node type/class (string, e.g., "KSampler")
+    - position: {x: float, y: float}
+    - size: {width: float, height: float}
+    - mode: Node mode (0=normal, 2=muted, 4=bypassed)
+    - parameters: Dictionary of parameter name -> value
+    - inputs: Array of {name, type, link} objects
+    - outputs: Array of {name, type, links} objects
+    
+    If no nodes are selected, returns empty array: {"nodes": []}
+    
+    AGENT WORKFLOW:
+    1. User mentions "this node", "these nodes", or asks about current selection
+    2. Call this tool to get selected node details
+    3. Extract relevant information from the returned data
+    4. Provide context-aware response or perform requested action
+    
+    EXAMPLE:
+    User: "What's the seed value?"
+    Agent: [Calls get_current_user_focus()]
+    Agent: [Finds KSampler in selected nodes, reads parameters.seed]
+    Agent: "The seed is currently set to 12345."
+    """
+    return await _execute_tool(ctx, "get_selected_nodes", {})
 
 
 # ============================================================================

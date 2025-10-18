@@ -251,6 +251,85 @@ export class FL_API {
         }
     }
 
+    /**
+     * Get currently selected nodes with their full data
+     * @returns {Array<object>} Array of selected node data objects
+     */
+    getSelectedNodes() {
+        try {
+            const selectedNodes = app.canvas.selected_nodes;
+            const result = [];
+            
+            // Iterate over selected nodes object (keys are node IDs)
+            for (const nodeId in selectedNodes) {
+                const node = selectedNodes[nodeId];
+                
+                // Extract widget values (parameters)
+                const parameters = {};
+                if (node.widgets) {
+                    for (const widget of node.widgets) {
+                        try {
+                            // Handle potentially non-serializable widget values
+                            parameters[widget.name] = widget.value;
+                        } catch (e) {
+                            console.warn(`[FL_API] Could not serialize widget ${widget.name}:`, e);
+                            parameters[widget.name] = String(widget.value);
+                        }
+                    }
+                }
+                
+                // Extract input slot info
+                const inputs = [];
+                if (node.inputs) {
+                    for (const input of node.inputs) {
+                        inputs.push({
+                            name: input.name,
+                            type: input.type,
+                            link: input.link || null
+                        });
+                    }
+                }
+                
+                // Extract output slot info
+                const outputs = [];
+                if (node.outputs) {
+                    for (const output of node.outputs) {
+                        outputs.push({
+                            name: output.name,
+                            type: output.type,
+                            links: output.links || []
+                        });
+                    }
+                }
+                
+                // Build node data object
+                result.push({
+                    id: node.id,
+                    title: node.title,
+                    type: node.comfyClass || node.type,
+                    position: { 
+                        x: node.pos[0], 
+                        y: node.pos[1] 
+                    },
+                    size: { 
+                        width: node.size[0], 
+                        height: node.size[1] 
+                    },
+                    mode: node.mode,
+                    parameters: parameters,
+                    inputs: inputs,
+                    outputs: outputs
+                });
+            }
+            
+            console.log(`[FL_API] Retrieved ${result.length} selected node(s)`);
+            return result;
+        } catch (error) {
+            console.error("[FL_API] getSelectedNodes error:", error);
+            throw error;
+        }
+    }
+
     // ==================== NODE MANIPULATION ====================
 
     /**

@@ -47,6 +47,7 @@ export class ToolExecutor {
             "pin_nodes": this._handlePinNodes.bind(this),
             "unpin_nodes": this._handleUnpinNodes.bind(this),
             "select_nodes": this._handleSelectNodes.bind(this),
+            "get_selected_nodes": this._handleGetSelectedNodes.bind(this),
             
             // Node Manipulation
             "get_node_values": this._handleGetNodeValues.bind(this),
@@ -300,6 +301,11 @@ export class ToolExecutor {
         const { node_ids } = params;
         const count = this.flApi.select(node_ids);
         return { selected_count: count };
+    }
+
+    async _handleGetSelectedNodes(params) {
+        const nodes = this.flApi.getSelectedNodes();
+        return { nodes };
     }
 
     // ==================== NODE MANIPULATION HANDLERS ====================
