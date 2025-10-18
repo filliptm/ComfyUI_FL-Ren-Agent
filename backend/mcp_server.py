@@ -23,6 +23,12 @@ from comfy_models import (
     ComfySearchFilesRequest, ComfySearchFilesResponse
 )
 from comfy_tools import get_comfy_tools, ComfyUIError, ComfyUINotFoundError
+from node_library import (
+    get_node_library_client,
+    NodeLibraryError,
+    NodeLibraryConnectionError,
+    NodeTypeNotFoundError
+)
 from manager import manager
 
 logger = logging.getLogger(__name__)
@@ -490,6 +496,70 @@ class ClearErrorBufferRequest(BaseModel):
 
 class WaitRequest(BaseModel):
     delay: float = Field(..., description="Brief period of time to wait (keep between 5 and 20 seconds). Great for waiting a bit after the workflow is queued to show some result")
+
+# ============================================================================
+# NODE LIBRARY REQUEST MODELS
+# ============================================================================
+
+class NodeLibrarySearchRequest(BaseModel):
+    """Search for ComfyUI node types by various criteria."""
+    query: Optional[str] = Field(
+        None,
+        description="Text search in node type names and descriptions (case-insensitive)"
+    )
+    category: Optional[str] = Field(
+        None,
+        description="Filter by node category (e.g., 'sampling', 'loaders', 'image')"
+    )
+    input_type: Optional[str] = Field(
+        None,
+        description="Find node types accepting this input type (e.g., 'LATENT', 'IMAGE')"
+    )
+    output_type: Optional[str] = Field(
+        None,
+        description="Find node types producing this output type (e.g., 'IMAGE', 'LATENT')"
+    )
+    max_results: int = Field(
+        20,
+        ge=1,
+        le=50,
+        description="Maximum number of results to return (1-50)"
+    )
+
+
+class NodeLibraryGetDetailsRequest(BaseModel):
+    """Get detailed information about a specific node type."""
+    node_type: str = Field(
+        ...,
+        description="Exact node type name (e.g., 'KSampler', 'CheckpointLoaderSimple')"
+    )
+
+
+class NodeLibraryFindCompatibleRequest(BaseModel):
+    """Find node types compatible with a given node type."""
+    node_type: str = Field(
+        ...,
+        description="Source node type name (e.g., 'KSampler')"
+    )
+    direction: Literal["downstream", "upstream", "both"] = Field(
+        "downstream",
+        description="downstream=connects AFTER, upstream=connects BEFORE, both=both directions"
+    )
+    output_slot: Optional[str] = Field(
+        None,
+        description="Specific output slot name to match (downstream only)"
+    )
+    input_slot: Optional[str] = Field(
+        None,
+        description="Specific input slot name to match (upstream only)"
+    )
+    max_results: int = Field(
+        30,
+        ge=1,
+        le=100,
+        description="Maximum results per direction (1-100)"
+    )
+
 
 @mcp.tool()
 async def wait(request: WaitRequest) -> Dict[str, Any]:
@@ -1031,6 +1101,201 @@ async def comfy_search_resources(request: ComfySearchFilesRequest, ctx: Context)
         raise RuntimeError(f"ComfyUI search operation failed: {e}")
     except Exception as e:
         logger.error(f"Unexpected error in comfy_search_files: {e}")
+        raise RuntimeError(f"Tool execution failed: {e}")
+
+
+# ============================================================================
+# COMFYUI NODE LIBRARY DISCOVERY TOOLS
+# ============================================================================
+
+@mcp.tool()
+async def node_library_search(request: NodeLibrarySearchRequest, ctx: Context) -> Dict[str, Any]:
+    """Search for available ComfyUI node types (not workflow nodes).
+    
+    This tool searches the library of installed node types that can be created
+    in workflows. Use this to discover what node types are available before
+    creating them with create_nodes().
+    
+    DISTINCTION FROM find_node():
+    - find_node() searches nodes already IN your workflow
+    - node_library_search() searches node TYPES available to create
+    
+    USE CASES:
+    - "What node types handle upscaling?" → output_type="IMAGE", query="upscale"
+    - "Show samplers" → category="sampling"
+    - "What accepts LATENT?" → input_type="LATENT"
+    - "Find LoRA loaders" → query="lora"
+    
+    RETURNS:
+    Array of matching node type definitions with inputs, outputs, categories.
+    Use node_library_get_details() for comprehensive info on a specific type.
+    """
+    try:
+        from config import settings
+        client = get_node_library_client(
+            server_url=settings.comfyui_server_url,
+            timeout=settings.comfyui_api_timeout
+        )
+        
+        results = await client.search_nodes(
+            query=request.query,
+            category=request.category,
+            input_type=request.input_type,
+            output_type=request.output_type,
+            max_results=request.max_results
+        )
+        
+        # Format results
+        formatted_results = [
+            {
+                "node_type": r.node_type,
+                "display_name": r.display_name,
+                "category": r.category,
+                "description": r.description,
+                "inputs": r.inputs,
+                "outputs": r.outputs,
+                "match_reason": r.match_reason
+            }
+            for r in results
+        ]
+        
+        return {
+            "query": request.model_dump(exclude_none=True),
+            "results": formatted_results,
+            "total_results": len(formatted_results),
+            "truncated": len(formatted_results) >= request.max_results
+        }
+        
+    except NodeLibraryConnectionError as e:
+        raise RuntimeError(f"ComfyUI server connection failed: {e}")
+    except NodeLibraryError as e:
+        raise RuntimeError(f"Node library search failed: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in node_library_search: {e}")
+        raise RuntimeError(f"Tool execution failed: {e}")
+
+
+@mcp.tool()
+async def node_library_get_details(request: NodeLibraryGetDetailsRequest, ctx: Context) -> Dict[str, Any]:
+    """Get comprehensive details about a specific node type.
+    
+    This tool provides everything needed to understand and use a node type
+    before creating it in the workflow with create_nodes().
+    
+    DISTINCTION FROM get_node_values():
+    - get_node_values() gets parameter VALUES from a workflow node instance
+    - node_library_get_details() gets parameter DEFINITIONS for a node type
+    
+    USE CASES:
+    - Before creating a node: understand what parameters it needs
+    - When planning workflow: verify input/output compatibility
+    - When debugging: check valid parameter ranges and types
+    - Learning: understand what a node type does
+    
+    RETURNS:
+    Complete node type specification including:
+    - All input parameters with types, defaults, constraints (min/max/options)
+    - All output types and names
+    - Category and display information
+    - Parameter order (for UI layout)
+    """
+    try:
+        from config import settings
+        client = get_node_library_client(
+            server_url=settings.comfyui_server_url,
+            timeout=settings.comfyui_api_timeout
+        )
+        
+        node_info = await client.get_node_details(request.node_type)
+        
+        return {
+            "node_type": request.node_type,
+            "display_name": node_info.get('display_name', request.node_type),
+            "category": node_info.get('category', ''),
+            "description": node_info.get('description', ''),
+            "inputs": node_info.get('input', {}),
+            "outputs": node_info.get('output', []),
+            "output_names": node_info.get('output_name', []),
+            "input_order": node_info.get('input_order', [])
+        }
+        
+    except NodeTypeNotFoundError as e:
+        raise RuntimeError(str(e))
+    except NodeLibraryConnectionError as e:
+        raise RuntimeError(f"ComfyUI server connection failed: {e}")
+    except NodeLibraryError as e:
+        raise RuntimeError(f"Node library lookup failed: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in node_library_get_details: {e}")
+        raise RuntimeError(f"Tool execution failed: {e}")
+
+
+@mcp.tool()
+async def node_library_find_compatible(request: NodeLibraryFindCompatibleRequest, ctx: Context) -> Dict[str, Any]:
+    """Find node types that can connect to/from a given node type.
+    
+    This tool helps discover what node types are compatible based on input/output
+    type matching. Use this when building workflows to find what comes next.
+    
+    DISTINCTION FROM connect_nodes():
+    - connect_nodes() connects EXISTING workflow nodes together
+    - node_library_find_compatible() finds compatible node TYPES to create
+    
+    USE CASES:
+    - Building workflow: "What can I connect after KSampler?" → downstream
+    - Understanding flow: "What feeds into VAEDecode?" → upstream
+    - Planning chain: "Build checkpoint → sampler → decode → save" → iterate downstream
+    - Type checking: "Can I connect this type to that?" → verify compatibility
+    
+    RETURNS:
+    Array of compatible node types with connection details:
+    - Which output/input slots are compatible
+    - What data types match
+    - Suggested connection patterns
+    """
+    try:
+        from config import settings
+        client = get_node_library_client(
+            server_url=settings.comfyui_server_url,
+            timeout=settings.comfyui_api_timeout
+        )
+        
+        compatible = await client.find_compatible_nodes(
+            node_type=request.node_type,
+            direction=request.direction,
+            output_slot=request.output_slot,
+            input_slot=request.input_slot,
+            max_results=request.max_results
+        )
+        
+        # Format results
+        formatted_compatible = [
+            {
+                "node_type": c.node_type,
+                "display_name": c.display_name,
+                "category": c.category,
+                "connection": c.connection,
+                "description": c.description
+            }
+            for c in compatible
+        ]
+        
+        return {
+            "source_node_type": request.node_type,
+            "direction": request.direction,
+            "compatible_nodes": formatted_compatible,
+            "total_compatible": len(formatted_compatible),
+            "truncated": len(formatted_compatible) >= request.max_results
+        }
+        
+    except NodeTypeNotFoundError as e:
+        raise RuntimeError(str(e))
+    except NodeLibraryConnectionError as e:
+        raise RuntimeError(f"ComfyUI server connection failed: {e}")
+    except NodeLibraryError as e:
+        raise RuntimeError(f"Node library compatibility search failed: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in node_library_find_compatible: {e}")
         raise RuntimeError(f"Tool execution failed: {e}")
 
 
