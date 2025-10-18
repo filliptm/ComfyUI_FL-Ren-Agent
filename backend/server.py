@@ -345,10 +345,10 @@ def filtered_message_history(
     # messages: list[ModelMessage] = result.all_messages()
     
     # Extract system message (always the first one with role="system")
-    system_message = next((msg for msg in messages if type(msg.parts[0]) == SystemPromptPart), None)
+    system_message = next((msg for msg in messages if len(msg.parts) > 0 and type(msg.parts[0]) == SystemPromptPart), None)
     
     # Filter non-system messages
-    non_system_messages = [msg for msg in messages if type(msg.parts[0]) != SystemPromptPart]
+    non_system_messages = [msg for msg in messages if len(msg.parts) > 0 and  type(msg.parts[0]) != SystemPromptPart]
     
     # Apply tool message filtering if requested
     if not include_tool_messages:
