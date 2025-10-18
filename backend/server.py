@@ -256,6 +256,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             
             elif msg_type == "execution_event":
                 event = data.get("event")
+                logger.debug(f"**execution_event**: {data}")
                 event_data = data.get("data", {})
                 await manager.handle_execution_event(event, event_data)
             
