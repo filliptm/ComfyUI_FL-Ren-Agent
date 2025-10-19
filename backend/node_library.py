@@ -322,20 +322,22 @@ class NodeLibraryClient:
         query_lower = query.lower()
         
         # Search in node type name
-        if query_lower in node_type.lower():
-            return True
+        if node_type is not None:
+            if query_lower in node_type.lower():
+                return True
         
-        # Search in display name
-        if query_lower in node_info.get('display_name', '').lower():
-            return True
-        
-        # Search in description
-        if query_lower in node_info.get('description', '').lower():
-            return True
-        
-        # Search in category
-        if query_lower in node_info.get('category', '').lower():
-            return True
+        if node_info is not None:
+            # Search in display name
+            if query_lower in node_info.get('display_name', '').lower():
+                return True
+            
+            # Search in description
+            if query_lower in node_info.get('description', '').lower():
+                return True
+            
+            # Search in category
+            if query_lower in node_info.get('category', '').lower():
+                return True
         
         return False
     
