@@ -135,7 +135,7 @@ export class ChatUI {
             min-height: 100px; /* Ensure space for tool cards */
           }
           .fl-tool-activity-overlay {
-            bottom: 5em !important; /* Fixed position above input */
+            bottom: 8em !important; /* Fixed position above input */
             max-height: 60vh; /* Prevent overflow */
           }
         `;
