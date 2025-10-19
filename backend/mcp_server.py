@@ -517,8 +517,8 @@ class WaitRequest(BaseModel):
 
 class NodeLibrarySearchRequest(BaseModel):
     """Search for ComfyUI node types by various criteria."""
-    query: Optional[str] = Field(
-        None,
+    query: str = Field(
+        ...,
         description="Text search in node type names and descriptions (case-insensitive)"
     )
     category: Optional[str] = Field(
