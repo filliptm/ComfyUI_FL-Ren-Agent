@@ -119,7 +119,7 @@ class MCPWebSocketClient:
 
     async def execute_tool(self, tool_name: str, parameters: dict, timeout_ms: int = 30000) -> dict:
         """Execute a tool via WebSocket callback."""
-        if not self.connected or not self.ws or self.ws.closed:
+        if not self.connected or not self.ws:
             raise RuntimeError("WebSocket not connected")
         
         request_id = str(uuid.uuid4())
