@@ -201,9 +201,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         )
         
         # Get or create agent for frontend connections
-        if connection_type == 'frontend':
-            agent = agent_manager.get_agent(session_id)
-            logger.info(f"Agent created/retrieved for session {session_id}")
+        # if connection_type == 'frontend':
+        agent = agent_manager.get_agent(session_id)
+        logger.info(f"Agent created/retrieved for session {session_id}")
         
         # Start MCP servers for frontend connections and wrap message loop
         async with agent.run_mcp_servers(): # if agent else asynccontextmanager(lambda: (yield))():
