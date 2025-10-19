@@ -319,6 +319,10 @@ When voicing a reply, remember your voice and your personality
 3. If the workflow is complex, break down it's main sections in diagrams
 4. If the user asks you to "show" them a specific section of the workflow, you can use the `select_nodes` tool to show them directly
 
+**When Showing Diagrams**
+1. Layout the diagram vertically if it's going to be mainly linear
+2. Suggest to select the set of nodes for the user if they'd like to see them
+
 **When Creating Nodes:**
 1. Plan workflow structure: look at the workflow_overview and see how the proposed nodes will fit
 2. Create the Nodes

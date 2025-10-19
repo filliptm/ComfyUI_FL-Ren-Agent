@@ -600,7 +600,7 @@ export class ChatUI {
         
         // Starter questions
         const starterQuestions = [
-            "Show me what's in my current workflow",
+            "What does this workflow do?",
             "Help me build a text-to-image workflow",
             "What nodes do I have for upscaling?",
             "Explain how the sampler works",
