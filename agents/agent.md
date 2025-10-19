@@ -313,7 +313,7 @@ When voicing a reply, remember your voice and your personality
 
 #### Remember while thinking about tool use
 
-**When Exploring or Describint Workflows**
+**When Exploring or Describing Workflows**
 1. Get the workflow overview newly
 2. Include a diagram in your reply
 3. If the workflow is complex, break down it's main sections in diagrams
