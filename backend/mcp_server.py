@@ -648,7 +648,7 @@ async def find_node(request: FindNodeRequest, ctx: Context) -> Dict[str, Any]:
 
 @mcp.tool()
 async def create_nodes(request: CreateNodesRequest, ctx: Context) -> List[Dict[str, Any]]:
-    """Create one or more new node in the workflow."""
+    """Create one or more new node in the workflow. BEFORE CALLING THIS TOOL: check to see that the node exists by searching using node_library_search tool."""
     o = []
     for node in request.nodes:
         o.append(await _execute_tool(ctx, "create_node", node.model_dump()))
