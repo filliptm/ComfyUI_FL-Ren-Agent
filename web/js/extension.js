@@ -210,8 +210,8 @@ app.registerExtension({
             app.extensionManager.registerSidebarTab({
                 id: "fl_js_assistant",
                 icon: "pi pi-comments",
-                title: "FL_JS Assistant",
-                tooltip: "AI assistant for workflow creation and modification",
+                title: "FL_JS Ren",
+                tooltip: "Ren: connect your flow",
                 type: "custom",
                 render: (el) => {
                     console.log("[FL_JS] Rendering sidebar tab...");
