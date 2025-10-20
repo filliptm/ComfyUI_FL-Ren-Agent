@@ -199,6 +199,20 @@ export class ChatUI {
                 this._updateConnectionStatus('connecting');
             }
         }
+
+        // Handle ren:// link clicks (add to _attachEventHandlers method)
+        this.messagesContainer.addEventListener('click', (e) => {
+            const renLink = e.target.closest('.ren-link');
+            if (renLink) {
+                e.preventDefault();
+                const protocol = renLink.dataset.protocol;
+                const text = renLink.dataset.text;
+                
+                if (protocol === 'message' && text) {
+                    this._sendMessage(text);
+                }
+            }
+        });
     }
 
     /**

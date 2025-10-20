@@ -18,9 +18,21 @@ export class MessageBubble {
         // Override the default link renderer
         renderer.link = function(href, title, text) {
             const safeTitle = title ? ` title="${title}"` : "";
+            
+            if (href.startsWith("ren://")) {
+                const protocol = href.substring(6); // Remove "ren://"
+                
+                if (protocol === "message") {
+                    return `<a href="#" class="ren-link" data-protocol="message" data-text="${text.replace(/"/g, '&quot;')}">${text}</a>`;
+                }
+                
+                // Future ren:// protocols can be added here
+                return `<a href="#" class="ren-link" data-protocol="${protocol}">${text}</a>`;
+            }
+            
             return `<a href="${href}"${safeTitle} target="_blank" rel="noopener noreferrer">${text}</a>`;
         };
-
+        
         marked.setOptions({
             breaks: true,
             gfm: true,
