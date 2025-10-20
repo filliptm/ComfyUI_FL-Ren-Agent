@@ -274,10 +274,14 @@ class FindNodeRequest(BaseModel):
     find_last: bool = Field(False, description="If true, search from end of array")
 
 class CreateNodeRequest(BaseModel):
-    """Request to create a new node."""
+    """Request to create a new node.
+
+    Simplified schema for better LLM JSON generation reliability.
+    Position flattened to x/y fields. Parameters removed - set them separately with set_node_values.
+    """
     node_type: str = Field(..., description="ComfyUI node class name (e.g., 'CheckpointLoaderSimple')")
-    parameters: Optional[Dict[str, Any]] = Field(None, description="Node parameter values as key-value pairs")
-    position: Optional[Dict[str, float]] = Field(None, description="Node position {x, y}")
+    x: Optional[float] = Field(None, description="X position (pixels from left)")
+    y: Optional[float] = Field(None, description="Y position (pixels from top)")
     
 class CreateNodesRequest(BaseModel):
     nodes: List[CreateNodeRequest] = Field(..., description="List of nodes to create each their own parameters")
@@ -337,11 +341,15 @@ class GetNodeSlotsRequest(BaseModel):
     node_id: Union[int, str] = Field(..., description="Node ID or title")
 
 class ConnectionSpec(BaseModel):
-    """Single connection specification for batch operations."""
-    source_node_id: Union[int, str] = Field(..., description="Source node ID or title")
-    target_node_id: Union[int, str] = Field(..., description="Target node ID or title")
-    source_slot: Optional[Union[str, int]] = Field(None, description="Source output slot name or index (optional for auto-match)")
-    target_slot: Optional[Union[str, int]] = Field(None, description="Target input slot name or index (optional for auto-match)")
+    """Single connection specification for batch operations.
+
+    Simplified schema for better LLM JSON generation - removed Union types.
+    Use node IDs (integers) for reliability. Slot names as strings only.
+    """
+    source_node_id: int = Field(..., description="Source node ID")
+    target_node_id: int = Field(..., description="Target node ID")
+    source_slot_name: Optional[str] = Field(None, description="Source output slot name (optional for auto-match)")
+    target_slot_name: Optional[str] = Field(None, description="Target input slot name (optional for auto-match)")
 
 class ConnectNodesBatchRequest(BaseModel):
     """Request to connect multiple node pairs in batch."""
@@ -378,13 +386,22 @@ class SetNodeRectRequest(BaseModel):
     height: Optional[float] = Field(None, description="Height (null to keep current)")
 
 class NodeRect(BaseModel):
+    """Single node layout specification.
+
+    Flattened schema for better LLM JSON generation - node_id included directly.
+    """
+    node_id: int = Field(..., description="Node ID to modify")
     x: Optional[float] = Field(None, description="X position (omit to keep current)")
     y: Optional[float] = Field(None, description="Y position (omit to keep current)")
     width: Optional[float] = Field(None, description="Width (omit to keep current)")
     height: Optional[float] = Field(None, description="Height (omit to keep current)")
-    
+
 class BatchLayoutRequest(BaseModel):
-    node_rects: Dict[int, NodeRect] = Field(..., description="A map of node id's (int) with their new rectangle settings for full or partial quick layout changes")
+    """Modify layout of multiple nodes.
+
+    Simplified schema - changed from Dict[int, NodeRect] to List[NodeRect].
+    """
+    node_rects: List[NodeRect] = Field(..., description="List of node rectangles to update")
 
 class PositionNodeLeftRequest(BaseModel):
     """Request to position node to the left of another."""
@@ -648,11 +665,18 @@ async def find_node(request: FindNodeRequest, ctx: Context) -> Dict[str, Any]:
 
 @mcp.tool()
 async def create_nodes(request: CreateNodesRequest, ctx: Context) -> List[Dict[str, Any]]:
-    """Create one or more new node in the workflow. BEFORE CALLING THIS TOOL: check to see that the node exists by searching using node_library_search tool."""
-    o = []
-    for node in request.nodes:
-        o.append(await _execute_tool(ctx, "create_node", node.model_dump()))
-    return o
+    """Create one or more new nodes in the workflow. BEFORE CALLING THIS TOOL: check to see that the node exists by searching using node_library_search tool.
+
+    This is a TRUE BATCH operation - all nodes are created in a single frontend execution without round-trips per node.
+    """
+    node_count = len(request.nodes)
+    logger.info(f"[BATCH] Creating {node_count} nodes in single batch operation")
+
+    # Send all nodes at once to frontend for batch creation
+    result = await _execute_tool(ctx, "create_nodes_batch", request.model_dump())
+
+    logger.info(f"[BATCH] Batch create complete: {node_count} nodes")
+    return result
 
 
 @mcp.tool()

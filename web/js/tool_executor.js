@@ -41,6 +41,7 @@ export class ToolExecutor {
             // Node Management
             "find_node": this._handleFindNode.bind(this),
             "create_node": this._handleCreateNode.bind(this),
+            "create_nodes_batch": this._handleCreateNodesBatch.bind(this),
             "remove_nodes": this._handleRemoveNodes.bind(this),
             "bypass_nodes": this._handleBypassNodes.bind(this),
             "unbypass_nodes": this._handleUnbypassNodes.bind(this),
@@ -272,6 +273,51 @@ export class ToolExecutor {
         return this.flApi.create(node_type, parameters || {}, position || null);
     }
 
+    async _handleCreateNodesBatch(params) {
+        const { nodes } = params;
+
+        console.log(`[ToolExecutor] Batch creating ${nodes.length} nodes`);
+        const startTime = performance.now();
+
+        // Create all nodes synchronously in one loop - no await between iterations
+        const results = [];
+        for (const nodeSpec of nodes) {
+            try {
+                // Convert flattened schema (x, y) to position dict for fl_api
+                let position = null;
+                if (nodeSpec.x !== undefined || nodeSpec.y !== undefined) {
+                    position = {
+                        x: nodeSpec.x ?? 0,
+                        y: nodeSpec.y ?? 0
+                    };
+                }
+
+                const result = this.flApi.create(
+                    nodeSpec.node_type,
+                    {}, // No parameters in simplified schema
+                    position
+                );
+                results.push({
+                    success: true,
+                    node_id: result.node_id,
+                    node_type: nodeSpec.node_type
+                });
+            } catch (error) {
+                console.error(`[ToolExecutor] Failed to create node ${nodeSpec.node_type}:`, error);
+                results.push({
+                    success: false,
+                    node_type: nodeSpec.node_type,
+                    error: error.message
+                });
+            }
+        }
+
+        const elapsed = performance.now() - startTime;
+        console.log(`[ToolExecutor] Batch created ${results.length} nodes in ${elapsed.toFixed(2)}ms`);
+
+        return results;
+    }
+
     async _handleRemoveNodes(params) {
         const { node_ids } = params;
         const count = this.flApi.remove(node_ids);
@@ -405,13 +451,24 @@ export class ToolExecutor {
 
     async _handleModifyLayout(params) {
         const { node_rects } = params;
-        const results = this.flApi.modifyLayout(node_rects);
-        return { 
-            results,
-            total_processed: results.length,
-            successful: results.filter(r => r.success).length,
-            failed: results.filter(r => !r.success).length
-        };
+
+        // Convert flattened List[NodeRect] to Dict[int, NodeRect] for fl_api
+        // Backend sends: [{node_id: 1, x: 10, y: 20}, {node_id: 2, x: 30, y: 40}]
+        // fl_api expects: {1: {x: 10, y: 20}, 2: {x: 30, y: 40}}
+        const rectsDict = {};
+        for (const rect of node_rects) {
+            const { node_id, ...rectData } = rect;
+            rectsDict[node_id] = rectData;
+        }
+
+        const results = this.flApi.modifyLayout(rectsDict);
+
+        // Log stats but return just the array to match backend expectation
+        const successful = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        console.log(`[ToolExecutor] Modified layout: ${results.length} nodes (${successful} success, ${failed} failed)`);
+
+        return results;
     }
 
     async _handlePositionNodeLeft(params) {

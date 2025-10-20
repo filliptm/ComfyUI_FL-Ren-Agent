@@ -350,10 +350,10 @@ def truncate_nested_strings(obj: Any, max_chars: int) -> Any:
         return obj
 
 def filtered_message_history(
-    messages: List[ModelMessage], 
-    limit: Optional[int] = 36, 
+    messages: List[ModelMessage],
+    limit: Optional[int] = 16,  # Balanced for Gemini - enough context without overwhelming JSON generation
     include_tool_messages: bool = False,
-    max_chars: int = 2000
+    max_chars: int = 1000  # Compress tool results but keep useful details
 ) -> Optional[List[Dict[str, Any]]]:
     """
     Filter and limit the message history from an AgentRunResult.
@@ -611,10 +611,25 @@ async def handle_user_message(
         })
         
         # Process message with agent (MCP servers already running from outer context)
-        response = await agent.run(
-            message.message, 
-            message_history=filtered_message_history(message_history, include_tool_messages=True)
-        )
+        # Retry on Gemini failures (empty content, malformed function calls, etc)
+        max_retries = 2
+        last_error = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = await agent.run(
+                    message.message,
+                    message_history=filtered_message_history(message_history, include_tool_messages=True)
+                )
+                break  # Success - exit retry loop
+            except UnexpectedModelBehavior as e:
+                last_error = e
+                if attempt < max_retries:
+                    logger.warning(f"Gemini generation failed (attempt {attempt + 1}/{max_retries + 1}): {str(e)[:100]}... Retrying...")
+                    continue
+                else:
+                    logger.error(f"Gemini generation failed after {max_retries + 1} attempts")
+                    raise  # Re-raise after final attempt
         
         if response is not None:
             # Set History (Mutable)

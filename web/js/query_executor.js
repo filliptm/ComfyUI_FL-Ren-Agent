@@ -27,36 +27,41 @@ export class QueryExecutor {
         try {
             // Start with all nodes
             let nodes = this.getAllNodes();
-            
+
             // Apply filters
             if (query.filters) {
                 nodes = this.applyFilters(nodes, query.filters);
             }
-            
+
             // Apply traversal
             if (query.traversal) {
                 nodes = this.applyTraversal(nodes, query.traversal);
             }
-            
+
             // Apply sorting
             if (query.sort) {
                 nodes = this.applySort(nodes, query.sort);
             }
-            
+
             // Apply pagination
             if (query.offset || query.limit) {
                 const start = query.offset || 0;
                 const end = query.limit ? start + query.limit : undefined;
                 nodes = nodes.slice(start, end);
             }
-            
+
             // Apply aggregation
             if (query.aggregation) {
                 return this.applyAggregation(nodes, query.aggregation);
             }
-            
-            // Format results
-            return this.formatResults(nodes, query);
+
+            // Format results - wrap in object for MCP compatibility
+            const results = this.formatResults(nodes, query);
+            return {
+                results,
+                count: results.length,
+                format: query.result_format || 'full'
+            };
         } catch (error) {
             console.error("[QueryExecutor] Query execution failed:", error);
             throw error;
@@ -655,8 +660,8 @@ export class QueryExecutor {
                 completely_disconnected: disconnected.length,
                 missing_required_connections: requiredSlotsMissing.length,
                 total_missing_slots: requiredSlotsMissing.reduce((sum, node) => sum + node.missing_count, 0)
-            },
-            diagram: this.generateDiagram(nodes)
+            }
+            // diagram removed - use workflow_diagram tool instead to avoid context overflow
         };
     }
 }

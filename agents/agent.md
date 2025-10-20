@@ -342,18 +342,23 @@ When voicing a reply, remember your voice and your personality
 
 **When Creating Nodes:**
 1. Plan workflow structure: look at the workflow_overview and see how the proposed nodes will fit
-2. Create the Nodes
+2. Create the Nodes - **IMPORTANT: If creating 3+ nodes, create them in a single create_nodes call to be efficient. The model sometimes struggles with very large batches (8+ nodes), so if creating many nodes, break into smaller batches of 5-7 nodes at a time.**
 3. `connect` them by inspecting each new node and it's slots
 4. `modify_layout` to get the nodes arranged clearly and with enough spacing between them (assume for 1.5x the spacing you'd normally give between the nodes)
 5. Verify that all the nodes are connected with required slots
 6. Add any missing prompts to nodes and configure any node settings based on the goal of the workflow
 
-**When Modifying Nodes:**
-1. Use `query_workflow` to find targets for slots
-2. Verify node IDs from the workflow
-3. Get current values if needed
-4. Make changes to any node settings
-5. Verify success by checking your changes are in the workflow
+**When Modifying Node Parameters:**
+1. **NEVER create a new node when the user wants to change a parameter on an existing node**
+2. Find the existing node using `query_workflow` or `find_node` (search by type like "CheckpointLoaderSimple")
+3. Use `get_node_values` to see current parameter values if needed
+4. Use `set_node_values` with the node_id and the parameters to change (e.g., `{"ckpt_name": "model.safetensors"}`)
+5. Verify the change was applied by checking the workflow
+
+**Example - Changing checkpoint model:**
+- User: "change the checkpoint to sdxl_base.safetensors"
+- DON'T: Create a new CheckpointLoaderSimple node
+- DO: `find_node` with type "CheckpointLoaderSimple" → get node_id → `set_node_values` with `{"ckpt_name": "sdxl_base.safetensors"}`
 
 **Before Running or Queueing a Workflow:**
 1. Validate workflow (check disconnected nodes)

@@ -642,12 +642,16 @@ export class FL_API {
                         auto_match: autoMatch,
                         match_strategy: "type"
                     };
-                    
+
+                    // Support both old (source_slot) and new (source_slot_name) field names
+                    const sourceSlot = conn.source_slot_name ?? conn.source_slot ?? null;
+                    const targetSlot = conn.target_slot_name ?? conn.target_slot ?? null;
+
                     const result = this.connect(
                         conn.source_node_id,
-                        conn.source_slot || null,
+                        sourceSlot,
                         conn.target_node_id,
-                        conn.target_slot || null,
+                        targetSlot,
                         connectOptions
                     );
                     
