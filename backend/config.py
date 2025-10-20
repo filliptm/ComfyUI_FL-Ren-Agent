@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     log_backend_to_file: bool = True
 
     # LLM Provider Configuration
-    llm_provider: Literal["openai", "anthropic", "gemini", "openrouter"] = "openrouter"
-    llm_model: str = "deepseek/deepseek-chat"
+    llm_provider: Literal["openai", "anthropic", "gemini", "openrouter"] = "gemini"
+    llm_model: str = "gemini-2.0-flash-exp"
     llm_temperature: float = 0.7
     llm_max_tokens: int = 32000
 

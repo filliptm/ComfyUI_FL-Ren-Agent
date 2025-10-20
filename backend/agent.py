@@ -145,10 +145,15 @@ def get_llm_model():
         )
     elif settings.llm_provider == "gemini":
         # Import here to avoid dependency if not used
-        from pydantic_ai.models.gemini import GeminiModel
-        return GeminiModel(
+        from pydantic_ai.models.google import GoogleModel
+        from pydantic_ai.providers.google import GoogleProvider
+
+        # Create provider with explicit API key
+        provider = GoogleProvider(api_key=settings.google_api_key)
+
+        return GoogleModel(
             settings.llm_model,
-            # api_key=settings.google_api_key
+            provider=provider
         )
     else:
         raise ValueError(f"Unknown LLM provider: {settings.llm_provider}")
