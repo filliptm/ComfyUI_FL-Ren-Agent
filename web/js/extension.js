@@ -176,6 +176,78 @@ function getToolConfig(toolName) {
             description: "Cataloging the building blocks"
         },
 
+        // Python-only tools (no executor needed)
+        "calculate_expressions": {
+            icon: "🧮",
+            label: "Calculate",
+            description: "Computing mathematical expressions"
+        },
+        "wait": {
+            icon: "⏳",
+            label: "Wait",
+            description: "Pausing thoughtfully"
+        },
+        "comfy_list_folders": {
+            icon: "📂",
+            label: "List Folders",
+            description: "Exploring directory structure"
+        },
+        "comfy_read_file": {
+            icon: "📄",
+            label: "Read File",
+            description: "Reading file contents"
+        },
+        "comfy_search_resources": {
+            icon: "🔍",
+            label: "Search",
+            description: "Searching through resources"
+        },
+        "node_library_search": {
+            icon: "🔍",
+            label: "Search Nodes",
+            description: "Searching node library"
+        },
+        "node_library_get_details": {
+            icon: "📖",
+            label: "Node Details",
+            description: "Fetching node information"
+        },
+        "node_library_find_compatible": {
+            icon: "🔗",
+            label: "Find Compatible",
+            description: "Finding compatible nodes"
+        },
+        "manager_get_install_status": {
+            icon: "📦",
+            label: "Install Status",
+            description: "Checking installation status"
+        },
+        "manager_install_node": {
+            icon: "⬇️",
+            label: "Install",
+            description: "Installing custom node"
+        },
+        "manager_uninstall_node": {
+            icon: "🗑️",
+            label: "Uninstall",
+            description: "Removing custom node"
+        },
+        "manager_update_node": {
+            icon: "🔄",
+            label: "Update",
+            description: "Updating custom node"
+        },
+        "manager_update_all": {
+            icon: "🔄",
+            label: "Update All",
+            description: "Updating all custom nodes"
+        },
+        "manager_get_node_mappings": {
+            icon: "🗺️",
+            label: "Node Mappings",
+            description: "Fetching node mappings"
+        },
+
         // Generic fallback
         "*": {
             icon: "⚡",
@@ -286,6 +358,42 @@ app.registerExtension({
                     }
                 } catch (error) {
                     console.error("[FL_JS] ❌ Error in tool execution:", error);
+                }
+            });
+            
+            // New handler for Python-only tools (no executor needed)
+            wsClient.on('tool_report', (message) => {
+                console.log("[FL_JS] 📊 TOOL REPORT EVENT FIRED:", message.tool_name);
+
+                const toolConfig = getToolConfig(message.tool_name);
+
+                // Show tool activity in floating card
+                try {
+                    const reportId = `report-${Date.now()}-${Math.random()}`;
+                    window.FL_JS?.chatUI?.toolActivity?.showTool(
+                        message.tool_name,
+                        reportId
+                    );
+
+                    // Auto-hide after 3 seconds for Python-only tools
+                    setTimeout(() => {
+                        window.FL_JS?.chatUI?.toolActivity?.hideTool(reportId);
+                    }, 3000);
+                } catch (error) {
+                    console.warn('[FL_JS] Could not show tool report:', error);
+                }
+
+                // Add to breadcrumb chain as well
+                try {
+                    window.FL_JS?.chatUI?.startToolInChain(
+                        message.tool_name,
+                        toolConfig.icon,
+                        toolConfig.label
+                    );
+                    // Mark as complete immediately since Python tools execute instantly
+                    window.FL_JS?.chatUI?.completeToolInChain(message.tool_name);
+                } catch (error) {
+                    console.warn('[FL_JS] Could not add tool to breadcrumb chain:', error);
                 }
             });
             

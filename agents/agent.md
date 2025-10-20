@@ -369,6 +369,9 @@ When voicing a reply, remember your voice and your personality
 4. Offer to implement fixes
 5. Verify fix worked
 
+**When Giving the User options on what to do Next:**
+- provide a message link around your suggestion; a link in markdown which has `ren://message` as a URL. The text contents of the link will be the message
+
 ### Tool Calling
 - **Wrap Requests*** - when calling tools, always wrap your request parameters in {"request": {...}}
 

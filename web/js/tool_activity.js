@@ -133,6 +133,64 @@ export class ToolActivity {
                 text: "Cataloging the building blocks"
             },
 
+            // Python-only tools
+            "calculate_expressions": {
+                icon: "🧮",
+                text: "Computing mathematical expressions"
+            },
+            "wait": {
+                icon: "⏳",
+                text: "Pausing thoughtfully"
+            },
+            "comfy_list_folders": {
+                icon: "📂",
+                text: "Exploring directory structure"
+            },
+            "comfy_read_file": {
+                icon: "📄",
+                text: "Reading file contents"
+            },
+            "comfy_search_resources": {
+                icon: "🔍",
+                text: "Searching through resources"
+            },
+            "node_library_search": {
+                icon: "🔍",
+                text: "Searching node library"
+            },
+            "node_library_get_details": {
+                icon: "📖",
+                text: "Fetching node information"
+            },
+            "node_library_find_compatible": {
+                icon: "🔗",
+                text: "Finding compatible nodes"
+            },
+            "manager_get_install_status": {
+                icon: "📦",
+                text: "Checking installation status"
+            },
+            "manager_install_node": {
+                icon: "⬇️",
+                text: "Installing custom node"
+            },
+            "manager_uninstall_node": {
+                icon: "🗑️",
+                text: "Removing custom node"
+            },
+            "manager_update_node": {
+                icon: "🔄",
+                text: "Updating custom node"
+            },
+            "manager_update_all": {
+                icon: "🔄",
+                text: "Updating all custom nodes"
+            },
+            "manager_get_node_mappings": {
+                icon: "🗺️",
+                text: "Fetching node mappings"
+            },
+
             // Generic fallback
             "*": {
                 icon: "⚡",

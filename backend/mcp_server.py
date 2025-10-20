@@ -287,6 +287,21 @@ async def _execute_tool(ctx: Context, tool_name: str, parameters: Dict[str, Any]
         timeout_ms=timeout_ms or 30000
     )
 
+import time
+async def _report_tool_activity(ctx: Context, tool_name: str) -> None:
+    """Report tool activity to frontend for Python-only tools."""
+    _ws_client = ctx.request_context.lifespan_context.get('client')
+    if _ws_client and _ws_client.connected:
+        try:
+            await _ws_client.ws.send(json.dumps({
+                'type': 'tool_report',
+                'session_id': _ws_client.session_id,
+                'tool_name': tool_name,
+                'timestamp': time.time()
+            }))
+        except Exception as e:
+            logger.debug(f"Could not report tool activity: {e}")
+
 
 # ============================================================================
 # REQUEST MODELS
@@ -659,6 +674,8 @@ async def calculate_expressions(request: CalcBatchParams, ctx: Context) -> Dict[
     -------
     list[float] : one numeric result per input expression (assignment returns assigned value)
     """
+    await _report_tool_activity(ctx, "calculate_expressions")
+    
     try:
         response = await acalc_batch(request)
         return {"results": response}
@@ -667,8 +684,10 @@ async def calculate_expressions(request: CalcBatchParams, ctx: Context) -> Dict[
         raise
 
 @mcp.tool()
-async def wait(request: WaitRequest) -> Dict[str, Any]:
+async def wait(request: WaitRequest, ctx: Context) -> Dict[str, Any]:
     """Use this to wait for some short period of time, perhaps after generating an image"""
+    await _report_tool_activity(ctx, "wait")
+    
     await asyncio.sleep(float(request.delay))
     return {"waited_for": request.delay}
 
@@ -1121,6 +1140,8 @@ async def comfy_list_folders(request: ComfyListFoldersRequest, ctx: Context) -> 
     
     SECURITY: All paths are validated and sandboxed to ComfyUI installation.
     """
+    await _report_tool_activity(ctx, "comfy_list_folders")
+    
     try:
         tools = get_comfy_tools()
         items = tools.list_folders(request.folder_type)
@@ -1163,6 +1184,8 @@ async def comfy_read_file(request: ComfyReadFileRequest, ctx: Context) -> Dict[s
     
     SECURITY: Files are sandboxed to ComfyUI directory, size limits enforced.
     """
+    await _report_tool_activity(ctx, "comfy_read_file")
+    
     try:
         tools = get_comfy_tools()
         content = tools.read_file(request.path, request.max_size)
@@ -1209,6 +1232,8 @@ async def comfy_search_resources(request: ComfySearchFilesRequest, ctx: Context)
     
     PERFORMANCE: Results limited by max_results, provides context for understanding.
     """
+    await _report_tool_activity(ctx, "comfy_search_resources")
+    
     try:
         tools = get_comfy_tools()
         results = tools.search_files(
@@ -1264,6 +1289,8 @@ async def node_library_search(request: NodeLibrarySearchRequest, ctx: Context) -
     Array of matching node type definitions with inputs, outputs, categories.
     Use node_library_get_details() for comprehensive info on a specific type.
     """
+    await _report_tool_activity(ctx, "node_library_search")
+    
     try:
         from config import settings
         client = get_node_library_client(
@@ -1333,6 +1360,8 @@ async def node_library_get_details(request: NodeLibraryGetDetailsRequest, ctx: C
     - Category and display information
     - Parameter order (for UI layout)
     """
+    await _report_tool_activity(ctx, "node_library_get_details")
+    
     try:
         from config import settings
         client = get_node_library_client(
@@ -1387,6 +1416,8 @@ async def node_library_find_compatible(request: NodeLibraryFindCompatibleRequest
     - What data types match
     - Suggested connection patterns
     """
+    await _report_tool_activity(ctx, "node_library_find_compatible")
+    
     try:
         from config import settings
         client = get_node_library_client(
@@ -1479,6 +1510,8 @@ async def manager_search_nodes(
     
     NOTE: If Manager not installed, returns error with installation instructions.
     """
+    await _report_tool_activity(ctx, "manager_search_nodes")
+    
     try:
         manager_client = ctx.request_context.lifespan_context.get('manager_client')
         if not manager_client:
@@ -1563,6 +1596,8 @@ async def manager_get_node_mappings(
     NOTE: This is different from node_library tools which search node TYPE definitions.
     This tool maps node types to their SOURCE PACK.
     """
+    await _report_tool_activity(ctx, "manager_get_node_mappings")
+    
     try:
         manager_client = ctx.request_context.lifespan_context.get('manager_client')
         if not manager_client:
@@ -1643,6 +1678,8 @@ async def manager_check_updates(
     
     NOTE: This is read-only. To actually update, user must use ComfyUI Manager UI.
     """
+    await _report_tool_activity(ctx, "manager_check_updates")
+    
     try:
         manager_client = ctx.request_context.lifespan_context.get('manager_client')
         if not manager_client:
@@ -1675,6 +1712,8 @@ async def get_recent_errors(request: GetRecentErrorsRequest, ctx: Context) -> Di
     Retrieves the N most recent errors that occurred during workflow execution.
     Useful for debugging failed workflows and understanding error patterns.
     """
+    await _report_tool_activity(ctx, "get_recent_errors")
+    
     limit = min(request.limit, 100)  # Cap at buffer size
     errors = manager.error_buffer.get_recent_errors(limit)
     return {
@@ -1690,6 +1729,8 @@ async def get_errors_for_run(request: GetErrorsForRunRequest, ctx: Context) -> D
     Retrieves all errors that occurred during a specific workflow execution,
     identified by its prompt_id. Use this to debug why a particular run failed.
     """
+    await _report_tool_activity(ctx, "get_errors_for_run")
+    
     errors = manager.error_buffer.get_errors_for_prompt(request.prompt_id)
     return {
         "prompt_id": request.prompt_id,
@@ -1704,6 +1745,8 @@ async def get_queue_status_details(request: GetQueueStatusDetailsRequest, ctx: C
     Returns information about currently running and queued workflows,
     including execution progress and node tracking.
     """
+    await _report_tool_activity(ctx, "get_queue_status_details")
+    
     queue_status = manager.execution_tracker.get_queue_status()
     active_executions = manager.execution_tracker.get_all_executions()
     
@@ -1720,6 +1763,8 @@ async def get_execution_details(request: GetExecutionDetailsRequest, ctx: Contex
     Provides comprehensive information about a workflow execution including
     current node, executed nodes, cached nodes, and status.
     """
+    await _report_tool_activity(ctx, "get_execution_details")
+    
     execution = manager.execution_tracker.get_execution_state(request.prompt_id)
     return {
         "prompt_id": request.prompt_id,
@@ -1734,6 +1779,8 @@ async def clear_error_buffer(request: ClearErrorBufferRequest, ctx: Context) -> 
     Removes all stored errors from the buffer. Use this to start fresh
     after fixing issues or when the buffer gets too cluttered.
     """
+    await _report_tool_activity(ctx, "clear_error_buffer")
+    
     previous_count = manager.error_buffer.get_count()
     manager.error_buffer.clear()
     return {
