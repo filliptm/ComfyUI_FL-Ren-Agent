@@ -1,10 +1,10 @@
 {
-  "current_mode": "debugging",
+  "current_mode": "implementation",
   "project": "fl_js",
-  "task": "investigating tool activity cards not showing",
+  "task": "Providing complete lifespan function",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "visual rendering issue despite console activity",
+  "focus": "Copy-paste ready mcp_lifespan with manager client initialization",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "testing and verification",
   "ui_integration": "app.extensionManager.registerSidebarTab",
@@ -49,7 +49,7 @@
   ],
   "features_designed": "start_button, settings_tab",
   "issue_location": "__init__.py line 33 and server.py line 373",
-  "notes_created": "notes/connect/backend.log, frontend.log, analysis.md, investigation.md, proposal.md",
+  "notes_created": "notes/workflow_sessions/",
   "root_cause_hypothesis": "HTTP 400 validation errors not captured, only execution errors",
   "root_cause": "investigating asynccontextmanager syntax error",
   "confidence": "very_high",
@@ -109,14 +109,18 @@
   "implementation_complete": "true",
   "user_satisfaction": "golden",
   "ready_for_testing": true,
-  "research_topic": "MCP and Agent persistence implementation locations",
-  "next_steps": "implement ErrorBuffer and ExecutionTracker classes",
-  "document_written": "notes/get_layout/implementation.md",
+  "research_topic": "ComfyUI Manager REST API and detection methods",
+  "next_steps": [
+    "Review with user",
+    "Discuss findings",
+    "Proceed with implementation if approved"
+  ],
+  "document_written": "notes/manager/investigation.md",
   "ready_to_implement": true,
   "readme_last_modified": "2025-10-14",
   "agent_name_change": "FL_JS -> Ren",
   "target_file": "notes/error_feedback/debug1/deep_investigation.md",
-  "notes_location": "notes/get_layout/",
+  "notes_location": "notes/manager/",
   "implementation_ready": true,
   "root_cause_confirmed": "validation errors not captured - need to wrap app.queuePrompt()",
   "ready_for_fix": true,
@@ -158,7 +162,9 @@
   "expected_performance_gain": "90% reduction in multi-message overhead",
   "implementation_doc_complete": true,
   "ready_for_implementation": true,
-  "files_to_modify": "backend/server.py",
+  "files_to_modify": [
+    "backend/mcp_server.py"
+  ],
   "modifications_count": 3,
   "verification_complete": true,
   "user_feedback": "nullcontext approach unnecessary - MCP server always present",
@@ -166,8 +172,57 @@
   "ideas_document": "notes/expressing_tools/ideas.md",
   "investigation_document": "notes/expressing_tools/investigation.md",
   "refined_ideas_document": "notes/expressing_tools/ideas.md",
-  "key_findings": "simplified trigger logic, lightweight overlay design, ComfyUI integration strategy",
+  "key_findings": [
+    "Manager has REST API via PromptServer.instance.routes",
+    "Detection via comfy_list_folders or /manager/version endpoint",
+    "FL_SystemCheck shows pattern for system introspection",
+    "Read-only operations are safe, write operations need security level",
+    "Recommend HTTP client approach over Python import"
+  ],
   "implementation_document": "notes/expressing_tools/implementation.md",
   "key_components": "ToolActivity class, ChatUI integration, extension event handlers",
-  "primary_suspects": "CSS positioning, tool execution speed, DOM insertion"
+  "primary_suspects": "CSS positioning, tool execution speed, DOM insertion",
+  "documents_written": [
+    "idea.md",
+    "investigation.md",
+    "README.md"
+  ],
+  "key_decisions": [
+    "Use Method 2 for detection (/manager/version endpoint)",
+    "Create backend/comfy_manager.py (avoid collision with backend/manager.py)",
+    "Follow node_library.py pattern with httpx client",
+    "Conditional tool registration in FastMCP on init",
+    "Raise ManagerAPIError from client to mcp_server.py",
+    "Log errors, don't crash"
+  ],
+  "implementation_pattern": "Follow backend/node_library.py structure",
+  "documents_created": [
+    "notes/manager/research.md",
+    "notes/manager/investigation.md",
+    "notes/manager/implementation.md",
+    "notes/manager/final_implementation.md"
+  ],
+  "files_to_create": [
+    "backend/comfy_manager.py"
+  ],
+  "total_loc": "~650 lines",
+  "tools_count": 6,
+  "tools_removed": [
+    "manager_check_installed",
+    "manager_list_installed",
+    "manager_get_pack_details"
+  ],
+  "rationale": [
+    "manager_check_installed -> handled in lifespan, accessible via ctx",
+    "manager_list_installed -> covered by comfy_list_folders and manager_search_nodes with installed_only filter",
+    "manager_get_pack_details -> redundant with search"
+  ],
+  "manager_client_in_lifespan": true,
+  "docstring_style": "agent-focused, when-to-use, not code examples",
+  "final_tools": [
+    "manager_search_nodes",
+    "manager_get_node_mappings",
+    "manager_check_updates"
+  ],
+  "ready_for_review": true
 }

@@ -29,7 +29,16 @@ from node_library import (
     NodeLibraryConnectionError,
     NodeTypeNotFoundError
 )
-from manager import manager
+
+from comfy_manager import (
+    get_comfy_manager_client,
+    ManagerError,
+    ManagerNotInstalledError,
+    ManagerConnectionError,
+    ManagerAPIError
+)
+
+from manager import manager # This is the Connection Manager, not comfy manager :D
 from calc import acalc_batch, CalcBatchParams
 
 logger = logging.getLogger(__name__)
@@ -174,6 +183,26 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[Any]:
     """Manage MCP server lifespan and persistent WebSocket connection."""
     global _WS_CLIENT
 
+    # Check if ComfyUI Manager is installed and initialize client
+    manager_client = None
+    manager_available = False
+    
+    try:
+        from config import settings
+        manager_client = get_comfy_manager_client(
+            server_url=settings.comfyui_server_url,
+            timeout=settings.comfyui_api_timeout
+        )
+        version_info = await manager_client.check_installed()
+        
+        if version_info.installed:
+            logger.info(f"[MCP] ComfyUI Manager detected (v{version_info.version})")
+            manager_available = True
+        else:
+            logger.warning("[MCP] ComfyUI Manager not installed - manager tools will return errors")
+    except Exception as e:
+        logger.warning(f"[MCP] Could not check Manager status: {e}")
+
     if os.getenv('FL_MCP_MODE') == 'subprocess':
         session_id = os.getenv('FL_SESSION_ID')
         ws_url = os.getenv('FL_WS_URL')
@@ -194,15 +223,22 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[Any]:
             await _WS_CLIENT.connect()
             logger.info("[MCP] WebSocket client reconnected (persistent)")
         
-        yield {"client": _WS_CLIENT}
+        yield {
+            "client": _WS_CLIENT,
+            "manager_client": manager_client,
+            "manager_available": manager_available
+        }
 
         # NOTE: no disconnect/teardown here; keep WS open for the process lifetime.
         return
 
     # Standalone (no WebSocket bridge)
     logger.info("[MCP] Running in standalone mode (no WebSocket)")
-    yield {"client": None}
-
+    yield {
+        "client": None,
+        "manager_client": manager_client,
+        "manager_available": manager_available
+    }
 
 # Initialize FastMCP server with lifespan
 mcp = FastMCP("FL_Agent Workflow Tools", lifespan=mcp_lifespan)
@@ -573,6 +609,30 @@ class NodeLibraryFindCompatibleRequest(BaseModel):
         le=100,
         description="Maximum results per direction (1-100)"
     )
+
+# ============================================================================
+# MANAGER REQUEST MODELS
+# ============================================================================
+
+class ManagerSearchNodesRequest(BaseModel):
+    """Search for custom node packs in ComfyUI Manager."""
+    query: Optional[str] = Field(None, description="Search query for node pack name/description/author")
+    category: Optional[str] = Field(None, description="Filter by category")
+    installed_only: bool = Field(False, description="Only show installed packs")
+    updates_available: bool = Field(False, description="Only show packs with updates available")
+    mode: Literal["local", "remote", "cache"] = Field("cache", description="Data source mode")
+    max_results: int = Field(20, ge=1, le=100, description="Maximum results to return")
+
+
+class ManagerGetNodeMappingsRequest(BaseModel):
+    """Get node type to pack mappings from ComfyUI Manager."""
+    node_type: Optional[str] = Field(None, description="Specific node type to look up (empty for all)")
+    mode: Literal["local", "remote", "nickname"] = Field("local", description="Mapping source")
+
+
+class ManagerCheckUpdatesRequest(BaseModel):
+    """Check for available updates to installed node packs."""
+    mode: Literal["local", "remote"] = Field("remote", description="Check mode")
 
 # ===========================================================================
 # GENERAL UTILITIES
@@ -1371,6 +1431,226 @@ async def node_library_find_compatible(request: NodeLibraryFindCompatibleRequest
         logger.error(f"Unexpected error in node_library_find_compatible: {e}")
         raise RuntimeError(f"Tool execution failed: {e}")
 
+# ============================================================================
+# COMFYUI MANAGER TOOLS
+# ============================================================================
+
+@mcp.tool()
+async def manager_search_nodes(
+    request: ManagerSearchNodesRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Search for custom node packs available through ComfyUI Manager.
+    
+    Use this tool to discover node packs by name, category, or functionality.
+    Helps find and understand what node packs are available to install or
+    what's already installed in the ComfyUI environment.
+    
+    WHEN TO USE:
+    - "What node packs handle image upscaling?" → query="upscale"
+    - "Show me animation node packs" → category="animation"
+    - "What's installed?" → installed_only=True
+    - "What can I update?" → updates_available=True
+    - "Find packs by author" → query="author_name"
+    
+    FILTERS:
+    - query: Text search across name, description, author
+    - category: Filter by pack category
+    - installed_only: Only show installed packs (alternative to comfy_list_folders)
+    - updates_available: Only show packs with updates
+    - mode: "cache" (fast), "remote" (fresh), "local" (filesystem)
+    
+    RETURNS:
+    Array of node pack objects with full details including:
+    - name, description, author, repository
+    - installation status ("True", "False", "Update")
+    - stars, last_update, category
+    - files (download URLs)
+    
+    NOTE: If Manager not installed, returns error with installation instructions.
+    """
+    try:
+        manager_client = ctx.request_context.lifespan_context.get('manager_client')
+        if not manager_client:
+            return {
+                "error": "ComfyUI Manager client not initialized",
+                "results": [],
+                "count": 0
+            }
+        
+        results = await manager_client.search_node_packs(
+            query=request.query,
+            category=request.category,
+            installed_only=request.installed_only,
+            updates_available=request.updates_available,
+            mode=request.mode,
+            max_results=request.max_results
+        )
+        
+        # Convert dataclass to dict
+        results_dict = [
+            {
+                "id": pack.id,
+                "name": pack.name,
+                "description": pack.description,
+                "author": pack.author,
+                "repository": pack.repository,
+                "installed": pack.installed,
+                "updatable": pack.updatable,
+                "stars": pack.stars,
+                "last_update": pack.last_update,
+                "category": pack.category,
+                "files": pack.files
+            }
+            for pack in results
+        ]
+        
+        return {
+            "results": results_dict,
+            "count": len(results_dict),
+            "truncated": len(results_dict) >= request.max_results
+        }
+        
+    except ManagerNotInstalledError as e:
+        logger.warning(f"[Manager] Not installed: {e}")
+        return {"error": str(e), "results": [], "count": 0}
+    except ManagerAPIError as e:
+        logger.error(f"[Manager] API error: {e}")
+        return {"error": str(e), "results": [], "count": 0}
+    except ManagerConnectionError as e:
+        logger.error(f"[Manager] Connection error: {e}")
+        return {"error": str(e), "results": [], "count": 0}
+    except Exception as e:
+        logger.error(f"[Manager] Unexpected error: {e}")
+        return {"error": str(e), "results": [], "count": 0}
+
+
+@mcp.tool()
+async def manager_get_node_mappings(
+    request: ManagerGetNodeMappingsRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Find which node pack provides a specific node type.
+    
+    Use this tool to discover the source node pack for any node type in ComfyUI.
+    Helps understand dependencies and find where to get missing nodes.
+    
+    WHEN TO USE:
+    - "What pack has the KSampler node?" → node_type="KSampler"
+    - "Where does FL_ImageCaptionSaver come from?" → node_type="FL_ImageCaptionSaver"
+    - "Show all node-to-pack mappings" → node_type=None (returns all)
+    - Debugging missing nodes → lookup node type to find pack
+    
+    RETURNS:
+    If node_type specified:
+    - Single mapping: {node_type, pack_id, pack_name, found: true/false}
+    
+    If node_type empty:
+    - All mappings: {mappings: {node_type: {pack_id, pack_name}, ...}, count}
+    
+    NOTE: This is different from node_library tools which search node TYPE definitions.
+    This tool maps node types to their SOURCE PACK.
+    """
+    try:
+        manager_client = ctx.request_context.lifespan_context.get('manager_client')
+        if not manager_client:
+            return {
+                "error": "ComfyUI Manager client not initialized",
+                "mappings": {},
+                "count": 0
+            }
+        
+        mappings = await manager_client.get_node_mappings(mode=request.mode)
+        
+        if request.node_type:
+            # Return specific mapping
+            if request.node_type in mappings:
+                mapping = mappings[request.node_type]
+                return {
+                    "node_type": mapping.node_type,
+                    "pack_id": mapping.node_pack_id,
+                    "pack_name": mapping.node_pack_name,
+                    "found": True
+                }
+            else:
+                return {
+                    "node_type": request.node_type,
+                    "found": False,
+                    "error": f"Node type '{request.node_type}' not found in mappings"
+                }
+        else:
+            # Return all mappings
+            mappings_dict = {
+                node_type: {
+                    "pack_id": mapping.node_pack_id,
+                    "pack_name": mapping.node_pack_name
+                }
+                for node_type, mapping in mappings.items()
+            }
+            return {
+                "mappings": mappings_dict,
+                "count": len(mappings_dict)
+            }
+            
+    except ManagerNotInstalledError as e:
+        logger.warning(f"[Manager] Not installed: {e}")
+        return {"error": str(e), "mappings": {}, "count": 0}
+    except ManagerAPIError as e:
+        logger.error(f"[Manager] API error: {e}")
+        return {"error": str(e), "mappings": {}, "count": 0}
+    except Exception as e:
+        logger.error(f"[Manager] Unexpected error: {e}")
+        return {"error": str(e), "mappings": {}, "count": 0}
+
+
+@mcp.tool()
+async def manager_check_updates(
+    request: ManagerCheckUpdatesRequest,
+    ctx: Context
+) -> Dict[str, Any]:
+    """Check if any installed node packs have available updates.
+    
+    Use this tool to discover if the ComfyUI installation has outdated node packs
+    that could benefit from updates.
+    
+    WHEN TO USE:
+    - Maintenance: "Are there any updates available?"
+    - Before troubleshooting: Check if updating might fix issues
+    - After installing ComfyUI: See what's outdated
+    - Regular checks: Keep environment up to date
+    
+    MODES:
+    - "remote": Check against remote repositories (fresh, slower)
+    - "local": Check against local cache (fast, may be stale)
+    
+    RETURNS:
+    {
+        "updates_available": bool,
+        "details": {...} or "message": "No updates available"
+    }
+    
+    NOTE: This is read-only. To actually update, user must use ComfyUI Manager UI.
+    """
+    try:
+        manager_client = ctx.request_context.lifespan_context.get('manager_client')
+        if not manager_client:
+            return {
+                "error": "ComfyUI Manager client not initialized",
+                "updates_available": False
+            }
+        
+        result = await manager_client.check_updates(mode=request.mode)
+        return result
+        
+    except ManagerNotInstalledError as e:
+        logger.warning(f"[Manager] Not installed: {e}")
+        return {"error": str(e), "updates_available": False}
+    except ManagerAPIError as e:
+        logger.error(f"[Manager] API error: {e}")
+        return {"error": str(e), "updates_available": False}
+    except Exception as e:
+        logger.error(f"[Manager] Unexpected error: {e}")
+        return {"error": str(e), "updates_available": False}
 
 # ============================================================================
 # ERROR FEEDBACK & QUEUE STATUS TOOLS
