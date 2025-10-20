@@ -616,7 +616,8 @@ class NodeLibraryFindCompatibleRequest(BaseModel):
 
 class ManagerSearchNodesRequest(BaseModel):
     """Search for custom node packs in ComfyUI Manager."""
-    query: Optional[str] = Field(None, description="Search query for node pack name/description/author")
+    query: str = Field(..., description="Search query for node pack name/description/author")
+    node_filter: str = Field(..., description="Regex pattern to filter by node class names (e.g., 'KSampler', 'FL_.*', 'Image.*Saver')")
     category: Optional[str] = Field(None, description="Filter by category")
     installed_only: bool = Field(False, description="Only show installed packs")
     updates_available: bool = Field(False, description="Only show packs with updates available")
@@ -1442,13 +1443,14 @@ async def manager_search_nodes(
 ) -> Dict[str, Any]:
     """Search for custom node packs available through ComfyUI Manager.
     
-    Use this tool to discover node packs by name, category, or functionality.
-    Helps find and understand what node packs are available to install or
-    what's already installed in the ComfyUI environment.
+    Use this tool to discover node packs by name, category, functionality, or specific nodes.
+    Helps find and understand what node packs are available to install or already installed.
     
     WHEN TO USE:
     - "What node packs handle image upscaling?" → query="upscale"
     - "Show me animation node packs" → category="animation"
+    - "Which pack has KSampler?" → node_filter="KSampler"
+    - "Find FL nodes" → node_filter="FL_.*"
     - "What's installed?" → installed_only=True
     - "What can I update?" → updates_available=True
     - "Find packs by author" → query="author_name"
@@ -1456,16 +1458,24 @@ async def manager_search_nodes(
     FILTERS:
     - query: Text search across name, description, author
     - category: Filter by pack category
-    - installed_only: Only show installed packs (alternative to comfy_list_folders)
+    - node_filter: Regex pattern to match node class names (RECOMMENDED for specific nodes)
+    - installed_only: Only show installed packs
     - updates_available: Only show packs with updates
     - mode: "cache" (fast), "remote" (fresh), "local" (filesystem)
     
+    NODE FILTER EXAMPLES:
+    - "KSampler" → exact match
+    - "FL_.*" → all FL nodes
+    - "Image.*Saver" → ImageSaver, ImageBatchSaver, etc.
+    - "(Load|Save)Image" → LoadImage or SaveImage
+    
     RETURNS:
-    Array of node pack objects with full details including:
+    Array of node pack objects with:
     - name, description, author, repository
     - installation status ("True", "False", "Update")
     - stars, last_update, category
     - files (download URLs)
+    - matched_nodes (if node_filter used) - list of node class names that matched
     
     NOTE: If Manager not installed, returns error with installation instructions.
     """
@@ -1481,6 +1491,7 @@ async def manager_search_nodes(
         results = await manager_client.search_node_packs(
             query=request.query,
             category=request.category,
+            node_filter=request.node_filter,
             installed_only=request.installed_only,
             updates_available=request.updates_available,
             mode=request.mode,
@@ -1500,7 +1511,8 @@ async def manager_search_nodes(
                 "stars": pack.stars,
                 "last_update": pack.last_update,
                 "category": pack.category,
-                "files": pack.files
+                "files": pack.files,
+                "matched_nodes": pack.matched_nodes  # Will be None if no node_filter
             }
             for pack in results
         ]

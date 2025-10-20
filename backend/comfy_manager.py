@@ -60,7 +60,7 @@ class NodePackInfo:
     last_update: str
     category: str
     files: List[str]
-
+    matched_nodes: Optional[List[str]] = None  # Node class names that matched filter
 
 @dataclass
 class ManagerVersion:
@@ -256,6 +256,7 @@ class ComfyManagerClient:
         self,
         query: Optional[str] = None,
         category: Optional[str] = None,
+        node_filter: Optional[str] = None,
         installed_only: bool = False,
         updates_available: bool = False,
         mode: Literal["local", "remote", "cache"] = "cache",
@@ -266,17 +267,18 @@ class ComfyManagerClient:
         Args:
             query: Text search in name/description/author
             category: Filter by category
+            node_filter: Regex pattern to match node class names within packs
             installed_only: Only show installed packs
             updates_available: Only show packs with updates
             mode: Data source mode
             max_results: Maximum results to return
             
         Returns:
-            List of matching NodePackInfo
+            List of matching NodePackInfo (with matched_nodes if node_filter used)
         """
         await self._ensure_installed()
         
-        # Check cache
+        # Check cache for node packs
         cache_key = f"node_packs_{mode}"
         cached = await self.cache.get(cache_key)
         
@@ -301,7 +303,8 @@ class ComfyManagerClient:
                     stars=pack.get("stars", 0),
                     last_update=pack.get("last_update", ""),
                     category=pack.get("category", ""),
-                    files=pack.get("files", [])
+                    files=pack.get("files", []),
+                    matched_nodes=None
                 )
             
             # Cache results
@@ -310,9 +313,49 @@ class ComfyManagerClient:
         else:
             all_packs = cached
         
+        # If node_filter is specified, fetch node mappings
+        node_to_pack_map = None
+        if node_filter:
+            try:
+                import re
+                node_pattern = re.compile(node_filter, re.IGNORECASE)
+                
+                # Get node mappings (node_type -> pack_id)
+                mappings = await self.get_node_mappings(mode="local")
+                
+                # Invert to pack_id -> [node_types]
+                pack_to_nodes = {}
+                for node_type, mapping in mappings.items():
+                    pack_id = mapping.node_pack_id
+                    if pack_id not in pack_to_nodes:
+                        pack_to_nodes[pack_id] = []
+                    pack_to_nodes[pack_id].append(node_type)
+                
+                # Filter nodes by pattern
+                node_to_pack_map = {}  # pack_id -> [matched_node_types]
+                for pack_id, node_types in pack_to_nodes.items():
+                    matched = [nt for nt in node_types if node_pattern.search(nt)]
+                    if matched:
+                        node_to_pack_map[pack_id] = matched
+                
+                logger.info(f"[Manager] Node filter matched {len(node_to_pack_map)} packs")
+                
+            except re.error as e:
+                logger.error(f"[Manager] Invalid regex pattern '{node_filter}': {e}")
+                # Continue without node filtering
+                node_to_pack_map = None
+        
         # Apply filters
         results = []
         for pack in all_packs.values():
+            # Node filter (must match first if specified)
+            if node_to_pack_map is not None:
+                if pack.id not in node_to_pack_map:
+                    continue
+                # Add matched nodes to pack info
+                pack.matched_nodes = node_to_pack_map[pack.id]
+            
+            # Text query filter
             if query:
                 query_lower = query.lower()
                 if not (
@@ -322,12 +365,15 @@ class ComfyManagerClient:
                 ):
                     continue
             
+            # Category filter
             if category and pack.category.lower() != category.lower():
                 continue
             
+            # Installation filter
             if installed_only and pack.installed == "False":
                 continue
             
+            # Update filter
             if updates_available and not pack.updatable:
                 continue
             
