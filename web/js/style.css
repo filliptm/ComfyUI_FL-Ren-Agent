@@ -197,7 +197,7 @@
 
 /* Ren Welcome Message */
 .fl-message.ren-welcome .fl-message-content {
-    background: linear-gradient(135deg, #C8A2C8 0%, #B794F4 100%);
+    background: linear-gradient(135deg, #c8a2c8b8 0%, #7961d39c 100%);
     border: none;
     color: #2d1f3d;
     text-align: left;
@@ -209,7 +209,56 @@
     display: none;
 }
 
-/* Starter Questions */
+/* Accordion for Starter Questions */
+.fl-accordion-header {
+    background: rgba(150, 120, 180, 0.15);
+    border: 1px solid rgba(150, 120, 180, 0.3);
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    margin-top: 12px;
+    transition: all 0.2s;
+    color: #2d1f3d;
+}
+
+.fl-accordion-header:hover {
+    background: rgba(150, 120, 180, 0.25);
+}
+
+.fl-accordion-arrow {
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.fl-accordion-content {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fl-accordion-option {
+    background: rgba(45, 31, 61, 0.4);
+    border: 1px solid rgba(150, 120, 180, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #2d1f3d;
+}
+
+.fl-accordion-option:hover {
+    background: rgba(45, 31, 61, 0.6);
+    border-color: rgba(150, 120, 180, 0.5);
+    transform: translateX(2px);
+}
+
+/* Legacy Starter Questions (keeping for backwards compatibility) */
 .fl-starter-questions {
     display: flex;
     flex-direction: column;

@@ -227,18 +227,18 @@ export class ChatUI {
             console.error('[ChatUI] Cannot render welcome, messagesContainer not ready');
             return;
         }
-        
+
         const messageEl = document.createElement('div');
         messageEl.className = 'fl-message ren-welcome';
-        
+
         const contentEl = document.createElement('div');
         contentEl.className = 'fl-message-content';
-        
+
         // Ren's introduction
         const intro = document.createElement('div');
         intro.innerHTML = `<strong>I'm Ren (蓮)</strong>, your ComfyUI workflow assistant.<br>Think of me as the bridge between what you imagine and what you create.`;
         contentEl.appendChild(intro);
-        
+
         // Starter questions
         const starterQuestions = [
             "What does this workflow do?",
@@ -250,13 +250,20 @@ export class ChatUI {
             "Analyze the prompts in the workflow",
             "Make something cool"
         ];
-        
-        const questionsContainer = document.createElement('div');
-        questionsContainer.className = 'fl-starter-questions';
-        
+
+        // Accordion header
+        const accordionHeader = document.createElement('div');
+        accordionHeader.className = 'fl-accordion-header';
+        accordionHeader.innerHTML = `<span>💭 Quick start suggestions</span><span class="fl-accordion-arrow">▼</span>`;
+
+        // Accordion content (collapsed by default)
+        const accordionContent = document.createElement('div');
+        accordionContent.className = 'fl-accordion-content';
+        accordionContent.style.display = 'none';
+
         starterQuestions.forEach(question => {
             const questionEl = document.createElement('div');
-            questionEl.className = 'fl-starter-question';
+            questionEl.className = 'fl-accordion-option';
             questionEl.textContent = question;
             questionEl.addEventListener('click', () => {
                 this.inputField.value = question;
@@ -269,12 +276,21 @@ export class ChatUI {
                     await this._sendMessage();
                 })();
             });
-            questionsContainer.appendChild(questionEl);
+            accordionContent.appendChild(questionEl);
         });
-        
-        contentEl.appendChild(questionsContainer);
+
+        // Toggle accordion on header click
+        accordionHeader.addEventListener('click', () => {
+            const isOpen = accordionContent.style.display !== 'none';
+            accordionContent.style.display = isOpen ? 'none' : 'flex';
+            const arrow = accordionHeader.querySelector('.fl-accordion-arrow');
+            arrow.textContent = isOpen ? '▼' : '▲';
+        });
+
+        contentEl.appendChild(accordionHeader);
+        contentEl.appendChild(accordionContent);
         messageEl.appendChild(contentEl);
-        
+
         this.messagesContainer.appendChild(messageEl);
     }
 
