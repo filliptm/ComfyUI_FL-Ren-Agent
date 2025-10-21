@@ -865,11 +865,15 @@ async def take_screenshot(request: TakeScreenshotRequest, ctx: Context) -> Dict[
     """
     result = await _execute_tool(ctx, "take_screenshot", request.model_dump())
     
-    # Add URL for easy markdown embedding
+    # Add URL for easy markdown embedding with public_url support
     if result.get('success') and result.get('filename'):
         import random
+        from config import settings
+        
+        # Use public_url from settings (supports both localhost and ngrok)
+        base_url = settings.public_url.rstrip('/')
         result['url'] = (
-            f"api/view?filename={result['filename']}"
+            f"{base_url}/api/view?filename={result['filename']}"
             f"&type=output&subfolder=screenshots&rand={random.random()}"
         )
     

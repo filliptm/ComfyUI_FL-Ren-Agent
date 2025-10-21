@@ -1,10 +1,10 @@
 {
-  "current_mode": "debugging",
+  "current_mode": "implementation",
   "project": "fl_js",
-  "task": "trace deprecated 'Ren is...' tool activity cards",
+  "task": "add PUBLIC_URL env var for ngrok image serving",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "find where showTool is being called",
+  "focus": "make image URLs work on both localhost and ngrok",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "Create placeholder icons",
   "ui_integration": "app.extensionManager.registerSidebarTab",

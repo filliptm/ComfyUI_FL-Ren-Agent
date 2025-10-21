@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["json", "text"] = "json"
 
+    # Public URL Configuration (for ngrok/production)
+    public_url: str = "http://localhost:8000"  # Default to localhost
+
     @property
     def resolved_model(self) -> str:
         """Get the model to use, falling back to provider default if not specified.
