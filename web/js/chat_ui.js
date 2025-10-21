@@ -9,6 +9,7 @@
  */
 
 import { MessageBubble } from './_components/MessageBubble.js';
+import { ToolActivity } from './tool_activity.js';
 
 /**
  * ChatUI class - Manages chat interface and message rendering
@@ -38,7 +39,7 @@ export class ChatUI {
             window.FL_JS = { chatUI: this };
         }
 
-        console.log('[ChatUI] Initialized with breadcrumb tool chain in chat history');
+        console.log('[ChatUI] Initialized with tool activity and breadcrumb chain');
     }
 
     /**
@@ -99,6 +100,10 @@ export class ChatUI {
         this.statusIndicator = this.container.querySelector('#fl-status-indicator');
         this.statusText = this.container.querySelector('#fl-status-text');
 
+        // Initialize tool activity floating cards now that messagesContainer exists
+        this.toolActivity = new ToolActivity(this.messagesContainer);
+        console.log('[ChatUI] Tool activity floating cards initialized');
+
         // Add debug styles for tool activity
         const debugStyle = document.createElement('style');
         debugStyle.textContent = `
@@ -113,7 +118,7 @@ export class ChatUI {
         `;
         document.head.appendChild(debugStyle);
         
-        // ✅ FIX #2: Verify DOM is ready before adding welcome message
+        // Verify DOM is ready before adding welcome message
         if (this.messagesContainer) {
             // Add welcome message after a tick to ensure DOM is fully inserted
             requestAnimationFrame(() => {
@@ -512,7 +517,7 @@ export class ChatUI {
      * @private
      */
     async _renderMessage(message) {
-        // ✅ FIX #2: Safety check before rendering
+        // Safety check before rendering
         if (!this.messagesContainer) {
             console.error('[ChatUI] Cannot render message, messagesContainer not ready');
             return;

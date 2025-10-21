@@ -1253,46 +1253,7 @@ export class FL_API {
     }
 
     // ==================== SYSTEM CONTROL ====================
-
-    /**
-     * Disable system sleep
-     * @returns {object} Result
-     */
-    disableSleep() {
-        // Placeholder - would need platform-specific implementation
-        console.log("[FL_API] disableSleep not implemented");
-        return { disabled: false, message: "Not implemented" };
-    }
-
-    /**
-     * Enable system sleep
-     * @returns {object} Result
-     */
-    enableSleep() {
-        // Placeholder - would need platform-specific implementation
-        console.log("[FL_API] enableSleep not implemented");
-        return { enabled: false, message: "Not implemented" };
-    }
-
-    /**
-     * Disable screensaver
-     * @returns {object} Result
-     */
-    disableScreensaver() {
-        // Placeholder - would need platform-specific implementation
-        console.log("[FL_API] disableScreensaver not implemented");
-        return { disabled: false, message: "Not implemented" };
-    }
-
-    /**
-     * Enable screensaver
-     * @returns {object} Result
-     */
-    enableScreensaver() {
-        // Placeholder - would need platform-specific implementation
-        console.log("[FL_API] enableScreensaver not implemented");
-        return { enabled: false, message: "Not implemented" };
-    }
+    // THIS IS ALL MOVED TO backend/mcp_server.py 'cause this is python level shit.
 
     /**
      * Send images to external URL

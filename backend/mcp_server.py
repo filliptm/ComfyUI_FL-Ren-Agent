@@ -1087,34 +1087,36 @@ async def get_queue_status(request: GetQueueStatusRequest, ctx: Context) -> Dict
 # SYSTEM CONTROL TOOLS
 # ============================================================================
 
-@mcp.tool()
-async def disable_sleep(request: DisableSleepRequest, ctx: Context) -> Dict[str, Any]:
-    """Disable system sleep/suspend."""
-    return await _execute_tool(ctx, "disable_sleep", {})
+# THIS IS COMMENTED OUT BECAUSE: Vanilla claude code is a lying piece of shit and it didn't implement shit, plus this is fucking backend functionality... vibe coded slop... removed.
+
+# @mcp.tool()
+# async def disable_sleep(request: DisableSleepRequest, ctx: Context) -> Dict[str, Any]:
+#     """Disable system sleep/suspend."""
+#     return await _execute_tool(ctx, "disable_sleep", {})
 
 
-@mcp.tool()
-async def enable_sleep(request: EnableSleepRequest, ctx: Context) -> Dict[str, Any]:
-    """Enable system sleep/suspend."""
-    return await _execute_tool(ctx, "enable_sleep", {})
+# @mcp.tool()
+# async def enable_sleep(request: EnableSleepRequest, ctx: Context) -> Dict[str, Any]:
+#     """Enable system sleep/suspend."""
+#     return await _execute_tool(ctx, "enable_sleep", {})
 
 
-@mcp.tool()
-async def disable_screensaver(request: DisableScreensaverRequest, ctx: Context) -> Dict[str, Any]:
-    """Disable screensaver."""
-    return await _execute_tool(ctx, "disable_screensaver", {})
+# @mcp.tool()
+# async def disable_screensaver(request: DisableScreensaverRequest, ctx: Context) -> Dict[str, Any]:
+#     """Disable screensaver."""
+#     return await _execute_tool(ctx, "disable_screensaver", {})
 
 
-@mcp.tool()
-async def enable_screensaver(request: EnableScreensaverRequest, ctx: Context) -> Dict[str, Any]:
-    """Enable screensaver."""
-    return await _execute_tool(ctx, "enable_screensaver", {})
+# @mcp.tool()
+# async def enable_screensaver(request: EnableScreensaverRequest, ctx: Context) -> Dict[str, Any]:
+#     """Enable screensaver."""
+#     return await _execute_tool(ctx, "enable_screensaver", {})
 
 
-@mcp.tool()
-async def send_images(request: SendImagesRequest, ctx: Context) -> Dict[str, Any]:
-    """Send images to an external URL."""
-    return await _execute_tool(ctx, "send_images", request.model_dump())
+# @mcp.tool()
+# async def send_images(request: SendImagesRequest, ctx: Context) -> Dict[str, Any]:
+#     """Send images to an external URL."""
+#     return await _execute_tool(ctx, "send_images", request.model_dump())
 
 
 # ============================================================================

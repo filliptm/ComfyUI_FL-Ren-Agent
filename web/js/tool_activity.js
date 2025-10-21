@@ -2,6 +2,320 @@
  * Tool Activity Visualization for FL_JS
  * Shows floating cards when tools are executing
  */
+
+/**
+ * Tool configuration registry
+ * Single source of truth for tool icons, labels, and descriptions
+ */
+export const TOOL_CONFIG = {
+    // Query & Understanding
+    "workflow_overview": {
+        icon: "🔍",
+        label: "Overview",
+        description: "Getting workflow summary and statistics"
+    },
+    "query_workflow": {
+        icon: "🔎", 
+        label: "Query",
+        description: "Searching workflow nodes and connections"
+    },
+    "workflow_diagram": {
+        icon: "📐",
+        label: "Diagram",
+        description: "Generating visual workflow diagram"
+    },
+
+    // Node Creation & Modification  
+    "create_nodes": {
+        icon: "✨",
+        label: "Create",
+        description: "Adding new nodes to workflow"
+    },
+    "remove_nodes": {
+        icon: "🗑️",
+        label: "Remove",
+        description: "Deleting nodes from workflow"
+    },
+    "connect_nodes": {
+        icon: "🔗",
+        label: "Connect",
+        description: "Linking nodes together"
+    },
+    
+    // Selection & Focus
+    "select_nodes": {
+        icon: "👁️",
+        label: "Select",
+        description: "Selecting nodes in canvas"
+    },
+    "find_node": {
+        icon: "🎯",
+        label: "Find",
+        description: "Locating specific node by criteria"
+    },
+    "get_current_node_selection": {
+        icon: "👁️",
+        label: "Get Selection",
+        description: "Reading currently selected nodes"
+    },
+
+    // Layout & Organization
+    "modify_layout": {
+        icon: "🏗️",
+        label: "Layout",
+        description: "Adjusting node positions and layout"
+    },
+    "get_layout": {
+        icon: "📐",
+        label: "Get Layout",
+        description: "Reading current layout configuration"
+    },
+
+    // Workflow Execution
+    "queue_workflow": {
+        icon: "🚀",
+        label: "Queue",
+        description: "Starting workflow execution"
+    },
+    "cancel_workflow": {
+        icon: "⏹️",
+        label: "Cancel",
+        description: "Stopping workflow execution"
+    },
+    "get_queue_status": {
+        icon: "📊",
+        label: "Status",
+        description: "Checking execution queue status"
+    },
+    "enable_auto_queue": {
+        icon: "🔄",
+        label: "Auto Queue",
+        description: "Enabling auto-queue on changes"
+    },
+    "disable_auto_queue": {
+        icon: "⏸️",
+        label: "Stop Auto",
+        description: "Disabling auto-queue mode"
+    },
+    "set_batch_count": {
+        icon: "🔢",
+        label: "Batch Count",
+        description: "Setting number of batch iterations"
+    },
+
+    // Node Value Manipulation
+    "set_node_values": {
+        icon: "⚙️",
+        label: "Set Values",
+        description: "Updating node widget values"
+    },
+    "get_node_values": {
+        icon: "📊",
+        label: "Get Values",
+        description: "Reading node widget values"
+    },
+    "get_node_slots": {
+        icon: "🔌",
+        label: "Get Slots",
+        description: "Reading node input/output slots"
+    },
+
+    // Node State
+    "bypass_nodes": {
+        icon: "🚫",
+        label: "Bypass",
+        description: "Disabling nodes without removing them"
+    },
+    "unbypass_nodes": {
+        icon: "✅",
+        label: "Unbypass",
+        description: "Re-enabling bypassed nodes"
+    },
+    "pin_nodes": {
+        icon: "📌",
+        label: "Pin",
+        description: "Preventing nodes from moving"
+    },
+    "unpin_nodes": {
+        icon: "📍",
+        label: "Unpin",
+        description: "Allowing nodes to be repositioned"
+    },
+
+    // Connection Operations
+    "connect_nodes_batch": {
+        icon: "🔗",
+        label: "Batch Connect",
+        description: "Creating multiple node connections"
+    },
+    "auto_connect_workflow": {
+        icon: "🧩",
+        label: "Auto Connect",
+        description: "Automatically connecting compatible nodes"
+    },
+
+    // Utilities & Generation
+    "generate_seed": {
+        icon: "🌱",
+        label: "Seed",
+        description: "Generating random seed value"
+    },
+    "generate_float": {
+        icon: "🎲",
+        label: "Random Float",
+        description: "Generating random decimal number"
+    },
+    "generate_int": {
+        icon: "🎲",
+        label: "Random Int",
+        description: "Generating random integer"
+    },
+    "random_choice": {
+        icon: "🎯",
+        label: "Random Choice",
+        description: "Selecting random item from list"
+    },
+
+    // System Control
+    "disable_sleep": {
+        icon: "☕",
+        label: "Keep Awake",
+        description: "Preventing system from sleeping"
+    },
+    "enable_sleep": {
+        icon: "😴",
+        label: "Allow Sleep",
+        description: "Allowing system sleep again"
+    },
+    "disable_screensaver": {
+        icon: "🖥️",
+        label: "No Screensaver",
+        description: "Disabling screensaver during execution"
+    },
+    "enable_screensaver": {
+        icon: "🌙",
+        label: "Screensaver",
+        description: "Re-enabling screensaver"
+    },
+    "send_images": {
+        icon: "📤",
+        label: "Send Images",
+        description: "Sending generated images to chat"
+    },
+
+    // Python-only tools
+    "calculate_expressions": {
+        icon: "🧮",
+        label: "Calculate",
+        description: "Evaluating math expressions"
+    },
+    "wait": {
+        icon: "⏳",
+        label: "Wait",
+        description: "Pausing execution for delay"
+    },
+
+    // ComfyUI File Operations
+    "comfy_list_folders": {
+        icon: "📂",
+        label: "List Folders",
+        description: "Browsing ComfyUI directory structure"
+    },
+    "comfy_read_file": {
+        icon: "📄",
+        label: "Read File",
+        description: "Reading ComfyUI resource files"
+    },
+    "comfy_search_resources": {
+        icon: "🔍",
+        label: "Search Resources",
+        description: "Searching for models and resources"
+    },
+
+    // Node Library
+    "node_library_search": {
+        icon: "🔍",
+        label: "Search Nodes",
+        description: "Searching available node types"
+    },
+    "node_library_get_details": {
+        icon: "📖",
+        label: "Node Details",
+        description: "Getting node type specifications"
+    },
+    "node_library_find_compatible": {
+        icon: "🔗",
+        label: "Find Compatible",
+        description: "Finding nodes compatible with slot types"
+    },
+
+    // Manager Operations
+    "manager_search_nodes": {
+        icon: "🔍",
+        label: "Search Manager",
+        description: "Searching ComfyUI Manager database"
+    },
+    "manager_get_node_mappings": {
+        icon: "🗺️",
+        label: "Node Mappings",
+        description: "Getting node-to-package mappings"
+    },
+    "manager_check_updates": {
+        icon: "🔄",
+        label: "Check Updates",
+        description: "Checking for custom node updates"
+    },
+
+    // Error Tracking
+    "get_recent_errors": {
+        icon: "⚠️",
+        label: "Recent Errors",
+        description: "Retrieving recent execution errors"
+    },
+    "get_errors_for_run": {
+        icon: "🔍",
+        label: "Run Errors",
+        description: "Getting errors for specific workflow run"
+    },
+    "clear_error_buffer": {
+        icon: "🧹",
+        label: "Clear Errors",
+        description: "Clearing error tracking buffer"
+    },
+
+    // Execution Tracking
+    "get_queue_status_details": {
+        icon: "📊",
+        label: "Queue Details",
+        description: "Getting detailed queue information"
+    },
+    "get_execution_details": {
+        icon: "🔍",
+        label: "Execution Details",
+        description: "Inspecting workflow execution progress"
+    },
+
+    // Generic fallback
+    "*": {
+        icon: "⚡",
+        label: "Tool",
+        description: "Executing tool operation"
+    }
+};
+
+/**
+ * Get tool configuration by name
+ * @param {string} toolName - Name of the tool
+ * @returns {object} - Icon, label, and description
+ */
+export function getToolConfig(toolName) {
+    return TOOL_CONFIG[toolName] || TOOL_CONFIG["*"];
+}
+
+/**
+ * Tool Activity Visualization
+ * Shows floating cards when tools are executing
+ */
 export class ToolActivity {
     constructor(chatContainer) {
         this.chatContainer = chatContainer;
@@ -9,194 +323,6 @@ export class ToolActivity {
         this.overlay = null;
         this.maxVisible = 3;
         this.autoCleanupMs = 30000; // 30 seconds fallback
-        
-        this.toolMessages = {
-            // Query & Understanding
-            "workflow_overview": {
-                icon: "🔍",
-                text: "Observing the essence of the workflow"
-            },
-            "query_workflow": {
-                icon: "🔎", 
-                text: "Tracing patterns in the graph"
-            },
-            "workflow_diagram": {
-                icon: "📐",
-                text: "Sketching the architecture of thought"
-            },
-
-            // Node Creation & Modification  
-            "create_node": {
-                icon: "✨",
-                text: "Manifesting new possibilities"
-            },
-            "remove_nodes": {
-                icon: "🗑️",
-                text: "Clearing the path"
-            },
-            "connect_nodes": {
-                icon: "🔗",
-                text: "Weaving connections"
-            },
-            
-            // Selection & Focus
-            "select_nodes": {
-                icon: "👁️",
-                text: "Focusing attention on the essential"
-            },
-            "find_node": {
-                icon: "🎯",
-                text: "Seeking the heart of the matter"
-            },
-
-            // Layout & Organization
-            "modify_layout": {
-                icon: "🏗️",
-                text: "Arranging the flow"
-            },
-            "position_node_left": {
-                icon: "⬅️",
-                text: "Guiding elements into place"
-            },
-            "position_node_right": {
-                icon: "➡️",
-                text: "Guiding elements into place"
-            },
-            "position_node_top": {
-                icon: "⬆️",
-                text: "Guiding elements into place"
-            },
-            "position_node_bottom": {
-                icon: "⬇️",
-                text: "Guiding elements into place"
-            },
-
-            // Workflow Execution
-            "queue_workflow": {
-                icon: "🚀",
-                text: "Setting creation in motion"
-            },
-            "cancel_workflow": {
-                icon: "⏹️",
-                text: "Gently pausing the process"
-            },
-            "get_queue_status": {
-                icon: "📊",
-                text: "Checking the pulse of creation"
-            },
-
-            // Value Manipulation
-            "set_node_values": {
-                icon: "⚙️",
-                text: "Tuning the harmonics"
-            },
-            "get_node_values": {
-                icon: "📊",
-                text: "Reading the current state"
-            },
-
-            // Utilities & Generation
-            "generate_seed": {
-                icon: "🌱",
-                text: "Planting seeds of randomness"
-            },
-            "generate_float": {
-                icon: "🎲",
-                text: "Weaving chance into the pattern"
-            },
-            "random_choice": {
-                icon: "🎯",
-                text: "Choosing from the field of possibilities"
-            },
-
-            // File & Directory Operations
-            "list_directory": {
-                icon: "📁",
-                text: "Exploring the paths available"
-            },
-            "read_file": {
-                icon: "📜",
-                text: "Reading the written wisdom"
-            },
-            "write_file": {
-                icon: "✍️",
-                text: "Inscribing new knowledge"
-            },
-
-            // ComfyUI Integration
-            "get_extensions": {
-                icon: "🧩",
-                text: "Gathering the available tools"
-            },
-            "get_node_types": {
-                icon: "📋",
-                text: "Cataloging the building blocks"
-            },
-
-            // Python-only tools
-            "calculate_expressions": {
-                icon: "🧮",
-                text: "Computing mathematical expressions"
-            },
-            "wait": {
-                icon: "⏳",
-                text: "Pausing thoughtfully"
-            },
-            "comfy_list_folders": {
-                icon: "📂",
-                text: "Exploring directory structure"
-            },
-            "comfy_read_file": {
-                icon: "📄",
-                text: "Reading file contents"
-            },
-            "comfy_search_resources": {
-                icon: "🔍",
-                text: "Searching through resources"
-            },
-            "node_library_search": {
-                icon: "🔍",
-                text: "Searching node library"
-            },
-            "node_library_get_details": {
-                icon: "📖",
-                text: "Fetching node information"
-            },
-            "node_library_find_compatible": {
-                icon: "🔗",
-                text: "Finding compatible nodes"
-            },
-            "manager_get_install_status": {
-                icon: "📦",
-                text: "Checking installation status"
-            },
-            "manager_install_node": {
-                icon: "⬇️",
-                text: "Installing custom node"
-            },
-            "manager_uninstall_node": {
-                icon: "🗑️",
-                text: "Removing custom node"
-            },
-            "manager_update_node": {
-                icon: "🔄",
-                text: "Updating custom node"
-            },
-            "manager_update_all": {
-                icon: "🔄",
-                text: "Updating all custom nodes"
-            },
-            "manager_get_node_mappings": {
-                icon: "🗺️",
-                text: "Fetching node mappings"
-            },
-
-            // Generic fallback
-            "*": {
-                icon: "⚡",
-                text: "Working with the flow"
-            }
-        };
         
         this._createOverlay();
         console.log('[ToolActivity] Initialized');
@@ -210,8 +336,8 @@ export class ToolActivity {
     showTool(toolName, requestId = 'default') {
         console.log(`[ToolActivity] Showing tool: ${toolName} (${requestId})`);
         
-        // Get tool configuration
-        const config = this.toolMessages[toolName] || this.toolMessages['*'];
+        // Get tool configuration from exported config
+        const config = getToolConfig(toolName);
         
         // Create card element
         const card = this._createCard(config, requestId, toolName);
@@ -312,7 +438,7 @@ export class ToolActivity {
                 <span class="fl-tool-icon">${config.icon}</span>
                 <span class="fl-tool-label">Ren is...</span>
             </div>
-            <div class="fl-tool-text">${config.text}</div>
+            <div class="fl-tool-text">${config.description}</div>
             <div class="fl-tool-activity">
                 <div class="fl-activity-dot"></div>
                 <div class="fl-activity-dot"></div>

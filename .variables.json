@@ -1,10 +1,10 @@
 {
-  "current_mode": "debugging",
+  "current_mode": "implementation",
   "project": "fl_js",
-  "task": "investigate pydantic-ai upgrade - still 404",
+  "task": "tool descriptions updated to be practical",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "deep dive into agent.py and model initialization",
+  "focus": "web/js/tool_activity.js",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "Phase 2: Adopt Fill improvements - flatten LogicalFilter, update requirements.txt",
   "ui_integration": "app.extensionManager.registerSidebarTab",
@@ -36,14 +36,9 @@
     "dual logging (file + stdout)",
     "graceful shutdown"
   ],
-  "files_modified": [
-    "backend/model_defaults.py (new)",
-    "backend/config.py",
-    "backend/agent.py",
-    "backend/server.py"
-  ],
+  "files_modified": "web/js/tool_activity.js",
   "phase_2_step": "complete",
-  "analysis_complete": "false",
+  "analysis_complete": "true",
   "files_completed": [
     "backend/callback_router.py",
     "web/js/fl_api.js",
@@ -92,7 +87,7 @@
   "analysis_stage": "deep_dive",
   "confusion": "thought we found deadlock but logs show MCP loop IS waiting",
   "need": "clear determination of what the actual problem is",
-  "critical_finding": "use nullcontext instead of duplicating message loop",
+  "critical_finding": "ToolActivity class never instantiated in ChatUI",
   "need_to_check": "actual API response structure",
   "working_status": "backend fixed - tools working",
   "new_issue": "UI layout changes not reflecting until mouse interaction",
@@ -269,5 +264,8 @@
   "branch_comparison_complete": true,
   "error_type": "404 Not Found from Gemini API",
   "workaround": "use openrouter provider",
-  "analysis_file": "notes/fill_merge/analysis.md"
+  "analysis_file": "notes/fill_merge/analysis.md",
+  "notes_path": "notes/tool_activity/tool_name_keys.md",
+  "investigation_notes": "notes/tool_activity/investigation.md",
+  "implementation_doc": "notes/tool_activity/implementation.md"
 }
