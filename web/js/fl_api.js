@@ -17,6 +17,16 @@ import { api } from "../../../../scripts/api.js";
 export class FL_API {
     constructor() {
         console.log("[FL_API] Initialized");
+        this.sessionId = null;  // Will be set by extension
+    }
+
+    /**
+     * Set session ID for screenshot naming
+     * @param {string} sessionId - Session ID
+     */
+    setSessionId(sessionId) {
+        this.sessionId = sessionId;
+        console.log(`[FL_API] Session ID set: ${sessionId}`);
     }
 
     // ==================== NODE MANAGEMENT ====================
@@ -293,6 +303,113 @@ export class FL_API {
             return result;
         } catch (error) {
             console.error("[FL_API] getSelectedNodes error:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Fit view to selected nodes or all nodes
+     * @param {Array<number>|null} nodeIds - Optional array of node IDs to fit (null for selected)
+     * @returns {object} Result with count of fitted nodes
+     */
+    fitView(nodeIds = null) {
+        try {
+            let nodes;
+            
+            if (nodeIds === null) {
+                // Use currently selected nodes
+                nodes = Object.values(app.canvas.selected_nodes || {});
+                
+                if (nodes.length === 0) {
+                    console.warn("[FL_API] No nodes selected, fitting all nodes");
+                    nodes = undefined;  // undefined = fit all
+                }
+            } else if (Array.isArray(nodeIds) && nodeIds.length > 0) {
+                // Find specified nodes
+                nodes = nodeIds
+                    .map(id => this._findNode(id))
+                    .filter(n => n !== null);
+                
+                if (nodes.length === 0) {
+                    throw new Error(`None of the specified node IDs found: ${nodeIds}`);
+                }
+            } else {
+                // Empty array or undefined = fit all nodes
+                nodes = undefined;
+            }
+            
+            // Call LiteGraph fitNodes
+            app.canvas.fitNodes(nodes);
+            
+            const count = nodes ? nodes.length : app.graph._nodes.length;
+            console.log(`[FL_API] Fit view to ${count} node(s)`);
+            
+            return { 
+                fitted_count: count,
+                node_ids: nodes ? nodes.map(n => n.id) : app.graph._nodes.map(n => n.id)
+            };
+        } catch (error) {
+            console.error("[FL_API] fitView error:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Take a screenshot of the canvas
+     * @param {string} format - Image format ('jpeg' or 'png')
+     * @param {number} quality - JPEG quality (0.0-1.0)
+     * @returns {Promise<object>} Screenshot data with id, format, size
+     */
+    async takeScreenshot(format = 'jpeg', quality = 0.9) {
+        try {
+            // Get canvas element
+            const canvasElement = app.canvas.canvas;
+            if (!canvasElement) {
+                throw new Error('Canvas element not found');
+            }
+            
+            console.log(`[FL_API] Taking screenshot (${format}, quality: ${quality})`);
+            
+            // Convert canvas to blob
+            const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+            const blob = await new Promise((resolve, reject) => {
+                canvasElement.toBlob(
+                    (blob) => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error('Failed to create blob from canvas'));
+                        }
+                    },
+                    mimeType,
+                    quality
+                );
+            });
+            
+            // Convert blob to base64
+            const base64Data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+            
+            // Generate screenshot ID
+            const timestamp = Date.now();
+            const sessionId = this.sessionId || 'unknown';
+            const screenshotId = `screenshot_${timestamp}_${sessionId.substring(0, 8)}`;
+            
+            console.log(`[FL_API] Screenshot captured: ${screenshotId} (${blob.size} bytes)`);
+            
+            return {
+                screenshot_id: screenshotId,
+                format: format,
+                size_bytes: blob.size,
+                base64_data: base64Data
+            };
+            
+        } catch (error) {
+            console.error('[FL_API] Screenshot error:', error);
             throw error;
         }
     }

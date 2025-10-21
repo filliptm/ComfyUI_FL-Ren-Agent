@@ -46,6 +46,16 @@ class ToolResult(BaseMessage):
     execution_time_ms: float = Field(..., description="Execution time in milliseconds")
 
 
+class ScreenshotMessage(BaseMessage):
+    """Screenshot data from frontend."""
+
+    type: Literal["screenshot"] = "screenshot"
+    screenshot_id: str = Field(..., description="Unique screenshot ID")
+    format: Literal["jpeg", "png"] = Field(..., description="Image format")
+    size_bytes: int = Field(..., description="Image size in bytes")
+    base64_data: str = Field(..., description="Base64 encoded image data")
+
+
 # Server -> Client Messages
 
 class HandshakeAck(BaseMessage):

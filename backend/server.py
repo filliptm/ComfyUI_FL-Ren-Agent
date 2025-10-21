@@ -1,6 +1,7 @@
 """FastAPI server with WebSocket endpoint for FL_JS Agentic System."""
 
 import asyncio
+import base64
 import copy
 import logging
 from contextlib import asynccontextmanager
@@ -12,7 +13,7 @@ from pathlib import Path
 # Add parent directory to path to allow 'backend' imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -162,6 +163,91 @@ async def list_sessions() -> dict[str, Any]:
         "sessions": sessions,
         "total": len(sessions),
     }
+
+
+@app.get("/api/view")
+async def view_image(
+    filename: str,
+    subfolder: str = "",
+    type: str = "output",
+    rand: float = 0.0  # Cache busting
+) -> FileResponse:
+    """Serve ComfyUI images to all clients (frontend and PWA).
+    
+    This endpoint proxies ComfyUI's image serving, making it accessible
+    to both embedded frontend and standalone PWA clients.
+    
+    Args:
+        filename: Image filename
+        subfolder: Optional subfolder path
+        type: Image type ('output', 'input', 'temp')
+        rand: Cache busting parameter
+        
+    Returns:
+        FileResponse with appropriate media type
+        
+    Raises:
+        HTTPException: 400 for invalid type, 403 for security violation, 404 for not found
+    """
+    try:
+        # Import ComfyUI tools
+        from comfy_tools import get_comfy_tools
+        comfy_tools = get_comfy_tools()
+        
+        # Validate type
+        if type not in ["output", "input", "temp"]:
+            raise HTTPException(status_code=400, detail=f"Invalid type: {type}")
+        
+        # Build path based on type
+        if type == "output":
+            base_path = comfy_tools.comfyui_root / "output"
+        elif type == "input":
+            base_path = comfy_tools.comfyui_root / "input"
+        elif type == "temp":
+            base_path = comfy_tools.comfyui_root / "temp"
+        
+        # Handle subfolder
+        if subfolder:
+            file_path = base_path / subfolder / filename
+        else:
+            file_path = base_path / filename
+        
+        # Validate path is within allowed directory (security)
+        file_path = file_path.resolve()
+        base_path_resolved = base_path.resolve()
+        if not str(file_path).startswith(str(base_path_resolved)):
+            logger.warning(f"Path traversal attempt blocked: {file_path}")
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Check file exists
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+        
+        # Determine media type
+        media_types = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+        }
+        media_type = media_types.get(file_path.suffix.lower(), "application/octet-stream")
+        
+        # Return file
+        return FileResponse(
+            path=str(file_path),
+            media_type=media_type,
+            headers={
+                "Cache-Control": "no-cache",  # Respect rand parameter
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving image: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.websocket("/ws")
@@ -320,6 +406,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 elif msg_type == "tool_report":
                     # Tool activity report from MCP subprocess - route to frontend
                     await route_tool_report_to_frontend(session_id, data)
+                
+                elif msg_type == "screenshot":
+                    # Screenshot data from frontend
+                    await handle_screenshot(session_id, data)
 
                 elif msg_type == "comfy_error":
                     await manager.handle_comfy_error(data.get("data", {}))
@@ -785,6 +875,72 @@ async def handle_tool_result(session_id: str, data: dict[str, Any]) -> None:
             session_id,
             "TOOL_RESULT_ERROR",
             "Failed to process tool result",
+            {"error": str(e)},
+        )
+
+
+async def handle_screenshot(session_id: str, data: dict) -> None:
+    """Handle screenshot data from frontend.
+    
+    Receives base64-encoded screenshot, decodes it, and saves to
+    output/screenshots/ directory.
+    
+    Args:
+        session_id: Session ID
+        data: Screenshot message data
+    """
+    try:
+        from models import ScreenshotMessage
+        from comfy_tools import get_comfy_tools
+        
+        screenshot_msg = ScreenshotMessage(**data)
+        logger.info(
+            f"Screenshot from {session_id}: {screenshot_msg.screenshot_id} "
+            f"({screenshot_msg.format}, {screenshot_msg.size_bytes} bytes)"
+        )
+        
+        # Get ComfyUI output directory
+        comfy_tools = get_comfy_tools()
+        screenshots_dir = comfy_tools.comfyui_root / "output" / "screenshots"
+        
+        # Create screenshots directory if it doesn't exist
+        screenshots_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Decode base64 data
+        # Format: "data:image/jpeg;base64,/9j/4AAQ..."
+        if ";base64," in screenshot_msg.base64_data:
+            base64_str = screenshot_msg.base64_data.split(";base64,")[1]
+        else:
+            base64_str = screenshot_msg.base64_data
+        
+        image_data = base64.b64decode(base64_str)
+        
+        # Determine file extension
+        ext = "jpg" if screenshot_msg.format == "jpeg" else "png"
+        filename = f"{screenshot_msg.screenshot_id}.{ext}"
+        file_path = screenshots_dir / filename
+        
+        # Save to file
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+        
+        logger.info(f"Screenshot saved: {file_path}")
+        
+        # Send confirmation back to frontend (optional)
+        await manager.send_message(session_id, {
+            "type": "screenshot_saved",
+            "session_id": session_id,
+            "screenshot_id": screenshot_msg.screenshot_id,
+            "filename": filename,
+            "path": str(file_path),
+        }, target='frontend')
+        
+    except Exception as e:
+        logger.error(f"Error handling screenshot: {e}", exc_info=True)
+        await manager.send_error(
+            session_id,
+            "SCREENSHOT_ERROR",
+            "Failed to save screenshot",
             {"error": str(e)},
         )
 

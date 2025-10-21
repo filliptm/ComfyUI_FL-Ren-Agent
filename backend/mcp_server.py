@@ -366,6 +366,27 @@ class GetSelectedNodesRequest(BaseModel):
     """Request to get currently selected nodes."""
     pass
 
+class FocusOnNodesRequest(BaseModel):
+    """Request to fit canvas view to specific nodes."""
+    node_ids: Optional[List[int]] = Field(
+        None,
+        description="Node IDs to focus on (null=selected nodes, empty=all nodes)"
+    )
+
+class TakeScreenshotRequest(BaseModel):
+    """Request to take a screenshot of the canvas."""
+    format: Literal["jpeg", "png"] = Field(
+        "jpeg",
+        description="Image format (jpeg recommended for smaller size)"
+    )
+    quality: float = Field(
+        0.9,
+        ge=0.0,
+        le=1.0,
+        description="JPEG quality (0.0-1.0, only applies to jpeg format)"
+    )
+
+
 # Node Manipulation
 class GetNodeValuesRequest(BaseModel):
     """Request to get node parameter values."""
@@ -798,6 +819,61 @@ async def unpin_nodes(request: UnpinNodesRequest, ctx: Context) -> Dict[str, Any
 async def select_nodes(request: SelectNodesRequest, ctx: Context) -> Dict[str, Any]:
     """Select one or more nodes in the UI."""
     return await _execute_tool(ctx, "select_nodes", request.model_dump())
+
+@mcp.tool()
+async def focus_on_nodes(request: FocusOnNodesRequest, ctx: Context) -> Dict[str, Any]:
+    """Fit canvas view to show specific nodes or current selection.
+    
+    This tool adjusts the canvas viewport to center and fit the specified nodes,
+    making them clearly visible. Useful for:
+    - Focusing on a workflow section before taking a screenshot
+    - Navigating to specific nodes in large workflows
+    - Preparing visual context for user
+    
+    PARAMETERS:
+    - node_ids: Optional list of node IDs
+      - null (default): Fit to currently selected nodes
+      - [] (empty list): Fit to all nodes in workflow
+      - [1, 2, 3]: Fit to specific nodes
+    
+    WORKFLOW:
+    1. select_nodes([1, 2, 3]) - Select nodes
+    2. focus_on_nodes() - Zoom to selected nodes (no params needed)
+    3. take_screenshot() - Capture the focused view
+    
+    RETURNS:
+    - fitted_count: Number of nodes fitted in view
+    """
+    return await _execute_tool(ctx, "focus_on_nodes", request.model_dump())
+
+@mcp.tool()
+async def take_screenshot(request: TakeScreenshotRequest, ctx: Context) -> Dict[str, Any]:
+    """Capture the current ComfyUI canvas as an image.
+    
+    This tool takes a screenshot of the workflow canvas and saves it to
+    output/screenshots/. The screenshot can then be displayed to the user
+    or analyzed by the agent.
+    
+    USE CASES:
+    - Visual documentation: "Show me the workflow"
+    - Section capture: Focus on nodes, then screenshot
+    - Debugging: Capture problematic workflow sections for the user to see
+    - Sharing: Create shareable workflow images
+    
+    The URL can be embedded directly in agent responses:
+    ![Screenshot](api/view?filename={filename}&type=output&subfolder=screenshots&rand=0.123)
+    """
+    result = await _execute_tool(ctx, "take_screenshot", request.model_dump())
+    
+    # Add URL for easy markdown embedding
+    if result.get('success') and result.get('filename'):
+        import random
+        result['url'] = (
+            f"api/view?filename={result['filename']}"
+            f"&type=output&subfolder=screenshots&rand={random.random()}"
+        )
+    
+    return result
 
 
 @mcp.tool()

@@ -21,6 +21,11 @@ export class ToolExecutor {
         this.executionLog = [];
         this.maxLogEntries = 100;
         
+        // Set session ID on FL_API for screenshot naming
+        if (wsClient.sessionId) {
+            this.flApi.setSessionId(wsClient.sessionId);
+        }
+        
         // Register tool handlers
         this.toolHandlers = this._registerHandlers();
         
@@ -49,6 +54,8 @@ export class ToolExecutor {
             "unpin_nodes": this._handleUnpinNodes.bind(this),
             "select_nodes": this._handleSelectNodes.bind(this),
             "get_selected_nodes": this._handleGetSelectedNodes.bind(this),
+            "focus_on_nodes": this._handleFocusOnNodes.bind(this),
+            "take_screenshot": this._handleTakeScreenshot.bind(this),
             
             // Node Manipulation
             "get_node_values": this._handleGetNodeValues.bind(this),
@@ -357,6 +364,53 @@ export class ToolExecutor {
     async _handleGetSelectedNodes(params) {
         const nodes = this.flApi.getSelectedNodes();
         return { nodes };
+    }
+
+    /**
+     * Handle focus_on_nodes tool request
+     * @private
+     */
+    async _handleFocusOnNodes(params) {
+        try {
+            const { node_ids } = params;
+            const result = this.flApi.fitView(node_ids);
+            return result;
+        } catch (error) {
+            throw new Error(`Failed to fit view: ${error.message}`);
+        }
+    }
+
+    /**
+     * Handle take_screenshot tool request
+     * @private
+     */
+    async _handleTakeScreenshot(params) {
+        try {
+            const { format = 'jpeg', quality = 0.9 } = params;
+            
+            // Take screenshot
+            const screenshotData = await this.flApi.takeScreenshot(format, quality);
+            
+            // Send screenshot data to backend via WebSocket
+            await this.wsClient.send({
+                type: 'screenshot',
+                session_id: this.wsClient.sessionId,
+                ...screenshotData
+            });
+            
+            // Return result (backend will save the file)
+            const ext = format === 'png' ? 'png' : 'jpg';
+            return {
+                success: true,
+                screenshot_id: screenshotData.screenshot_id,
+                filename: `${screenshotData.screenshot_id}.${ext}`,
+                format: format,
+                size_bytes: screenshotData.size_bytes
+            };
+            
+        } catch (error) {
+            throw new Error(`Failed to take screenshot: ${error.message}`);
+        }
     }
 
     // ==================== NODE MANIPULATION HANDLERS ====================
