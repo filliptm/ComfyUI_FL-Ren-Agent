@@ -1,0 +1,228 @@
+/* Import base styles from chat UI */
+@import url('../js/style.css');
+
+/* PWA-specific overrides and additions */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(180deg, #1f1825 0%, #1a1420 100%);
+    color: #E6D5E6;
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Session Picker Styles */
+.session-picker {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.picker-header {
+    text-align: center;
+    margin-bottom: 24px;
+    padding: 20px 0;
+}
+
+.picker-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #C8A2C8;
+    margin-bottom: 8px;
+}
+
+.picker-header p {
+    font-size: 14px;
+    color: rgba(230, 213, 230, 0.7);
+}
+
+.session-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.session-card {
+    background: rgba(200, 162, 200, 0.08);
+    border: 1px solid rgba(200, 162, 200, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s;
+}
+
+.session-card:active {
+    background: rgba(200, 162, 200, 0.12);
+    transform: scale(0.98);
+}
+
+.session-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.session-id {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #E6D5E6;
+}
+
+.session-status {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.status-badge {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(183, 148, 244, 0.15);
+    border: 1px solid rgba(183, 148, 244, 0.3);
+}
+
+.status-badge.frontend {
+    background: rgba(100, 181, 246, 0.15);
+    border-color: rgba(100, 181, 246, 0.3);
+}
+
+.status-badge.pwa {
+    background: rgba(200, 162, 200, 0.15);
+    border-color: rgba(200, 162, 200, 0.3);
+}
+
+.session-time {
+    font-size: 12px;
+    color: rgba(230, 213, 230, 0.5);
+}
+
+.btn-connect {
+    background: linear-gradient(135deg, #C8A2C8 0%, #B794F4 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    color: #2d1f3d;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(200, 162, 200, 0.2);
+    white-space: nowrap;
+}
+
+.btn-connect:active {
+    transform: scale(0.95);
+}
+
+.picker-footer {
+    display: flex;
+    justify-content: center;
+    padding: 12px 0;
+}
+
+.btn-secondary {
+    background: rgba(200, 162, 200, 0.15);
+    border: 1px solid rgba(200, 162, 200, 0.3);
+    border-radius: 10px;
+    padding: 12px 24px;
+    color: #E6D5E6;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:active {
+    background: rgba(200, 162, 200, 0.25);
+    transform: scale(0.95);
+}
+
+.loading, .no-sessions, .error {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(230, 213, 230, 0.6);
+}
+
+.loading {
+    font-size: 14px;
+}
+
+.no-sessions p:first-child,
+.error p:first-child {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.hint {
+    font-size: 12px;
+    color: rgba(230, 213, 230, 0.4);
+    margin-top: 8px;
+}
+
+/* Chat Container */
+.chat-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .fl-chat-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .fl-message {
+        max-width: 90%;
+    }
+    
+    .fl-chat-send {
+        padding: 0 16px;
+    }
+}
+
+/* Prevent pull-to-refresh on mobile */
+body {
+    overscroll-behavior-y: contain;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+    .session-picker,
+    .chat-container {
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+}

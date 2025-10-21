@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic_ai import Agent, UnexpectedModelBehavior
 
 from config import settings
@@ -98,6 +100,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Get project root and PWA directory
+PROJECT_ROOT = Path(__file__).parent.parent
+PWA_DIR = PROJECT_ROOT / "web" / "pwa"
+
+# Serve PWA static files
+app.mount("/pwa/static", StaticFiles(directory=str(PWA_DIR)), name="pwa_static")
+
 
 @app.get("/")
 async def root() -> dict[str, str]:
@@ -118,6 +127,36 @@ async def health() -> dict[str, Any]:
         "total_sessions": manager.get_total_session_count(),
         "pending_callbacks": callback_router.get_pending_count() if callback_router else 0,
         "active_agents": agent_manager.get_agent_count(),
+    }
+
+
+@app.get("/pwa")
+@app.get("/pwa/")
+async def serve_pwa() -> FileResponse:
+    """Serve PWA application."""
+    return FileResponse(str(PWA_DIR / "index.html"))
+
+
+@app.get("/api/sessions")
+async def list_sessions() -> dict[str, Any]:
+    """List active sessions for PWA session picker.
+    
+    Returns:
+        Dict with sessions list containing session_id, connections, and last_activity
+    """
+    sessions = []
+    for session_id, context in manager.session_contexts.items():
+        sessions.append({
+            "session_id": session_id,
+            "connections": manager.get_connection_info(session_id),
+            "last_activity": context.last_activity.isoformat(),
+            "has_frontend": manager.has_connection(session_id, 'frontend'),
+            "has_pwa": manager.has_connection(session_id, 'pwa'),
+        })
+    
+    return {
+        "sessions": sessions,
+        "total": len(sessions),
     }
 
 
@@ -163,9 +202,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             session_id = handshake.session_id
             
             # Detect connection type from client_version
-            # MCP subprocess sends client_version like "1.0.0-mcp"
-            if handshake.client_version and 'mcp' in handshake.client_version.lower():
-                connection_type = 'mcp'
+            if handshake.client_version:
+                version_lower = handshake.client_version.lower()
+                if 'mcp' in version_lower:
+                    connection_type = 'mcp'
+                elif 'pwa' in version_lower:
+                    connection_type = 'pwa'
+                else:
+                    connection_type = 'frontend'
             else:
                 connection_type = 'frontend'
             
@@ -648,20 +692,29 @@ async def handle_user_message(
                     raise last_error
         
         if response is not None:
+            # Determine which connections should receive the response
+            # PWA and frontend should both see agent responses
+            response_targets = []
+            if manager.has_connection(session_id, 'pwa'):
+                response_targets.append('pwa')
+            if manager.has_connection(session_id, 'frontend'):
+                response_targets.append('frontend')
+            
             # Set History (Mutable)
             message_history.clear()
             message_history.extend(response.all_messages())
             
-            # Send response
-            await manager.send_message(session_id, {
-                "type": "agent_response",
-                "session_id": session_id,
-                "message": response.output,
-                "tool_calls": [], # TODO set this to use the proper message parts
-                "is_final": True,
-            })
+            # Send response to all connected clients
+            for target in response_targets:
+                await manager.send_message(session_id, {
+                    "type": "agent_response",
+                    "session_id": session_id,
+                    "message": response.output,
+                    "tool_calls": [], # TODO set this to use the proper message parts
+                    "is_final": True,
+                }, target=target)
             
-            logger.info(f"Agent response sent to {session_id}")
+            logger.info(f"Agent response sent to {session_id} (targets: {response_targets})")
             
     except UnexpectedModelBehavior as ue:
         # Happens mainly when a model can't get a tool call right after so many tries

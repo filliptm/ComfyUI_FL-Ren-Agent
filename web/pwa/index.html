@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2d1f3d">
+    <meta name="description" content="Ren - Your AI assistant for ComfyUI workflows">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/pwa/static/manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa/static/icons/icon-512.png">
+    <link rel="apple-touch-icon" href="/pwa/static/icons/icon-192.png">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/pwa/static/styles.css">
+    
+    <title>Ren - ComfyUI Assistant</title>
+</head>
+<body>
+    <div id="app">
+        <!-- Session Picker (shown initially) -->
+        <div id="session-picker" class="session-picker">
+            <div class="picker-header">
+                <h1>Ren 🌸</h1>
+                <p>Select a ComfyUI session to connect</p>
+            </div>
+            
+            <div id="session-list" class="session-list">
+                <!-- Sessions will be populated here -->
+                <div class="loading">Loading sessions...</div>
+            </div>
+            
+            <div class="picker-footer">
+                <button id="refresh-sessions" class="btn-secondary">
+                    🔄 Refresh
+                </button>
+            </div>
+        </div>
+        
+        <!-- Chat Container (hidden initially) -->
+        <div id="chat-container" class="chat-container" style="display: none;">
+            <!-- Chat UI will be rendered here -->
+        </div>
+    </div>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/pwa/static/service-worker.js')
+                    .then(registration => {
+                        console.log('[PWA] Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('[PWA] Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+    
+    <!-- Main App Script (ES6 Module) -->
+    <script type="module" src="/pwa/static/app.js"></script>
+</body>
+</html>
