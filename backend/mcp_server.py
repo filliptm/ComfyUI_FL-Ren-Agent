@@ -1054,7 +1054,7 @@ async def modify_layout(request: BatchLayoutRequest, ctx: Context) -> List[Dict[
 
 @mcp.tool()
 async def queue_workflow(request: QueueWorkflowRequest, ctx: Context) -> Dict[str, Any]:
-    """Queue the workflow for execution. User might say 'run' the workflow."""
+    """Queue the workflow for execution. User might say 'run' the workflow. Before calling this tool, call `workflow_overview` to double check for disconnected nodes and any missing slot connections"""
     return await _execute_tool(ctx, "queue_workflow", request.model_dump())
 
 

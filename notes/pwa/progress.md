@@ -2,7 +2,7 @@
 
 **Project:** Mobile PWA for ComfyUI via Ren Assistant  
 **Started:** 2025-10-21  
-**Status:** Phase 2 Complete ✅
+**Status:** Phase 2 Complete ✅ | Feedback 1 Implementation Ready ✅
 
 ---
 
@@ -10,11 +10,13 @@
 
 - [x] **Phase 1: Core PWA Implementation** (100%)
 - [x] **Phase 2: Notifications** (100%)
+- [x] **Debug: Tool Activity Display** (Analysis Complete - Ready to Fix)
+- [x] **Feedback Session 1: Image & Screenshot Features** (Research Complete - Ready to Implement)
 - [ ] **Phase 3: Polish & Testing** (0%)
 
-**Estimated Total:** ~8-10 hours  
-**Time Invested:** ~4 hours  
-**Completion:** ~66%
+**Estimated Total:** ~10-12 hours  
+**Time Invested:** ~6 hours  
+**Completion:** ~60%
 
 ---
 
@@ -205,6 +207,146 @@ System Message:
 
 ---
 
+## 🔍 Debug Analysis: Tool Activity Display (COMPLETE)
+
+### Issue Identified 🐛
+**Problem:** Tool activity cards not showing in PWA despite proper initialization
+
+**Root Cause Found:**
+- `tool_request` and `tool_report` messages sent with `target='frontend'`
+- PWA connects with `connection_type='pwa'`
+- `manager.send_message()` only sends to specified target
+- **PWA never receives tool activity messages!**
+
+### Investigation Summary
+
+**Files Analyzed:**
+- `web/js/tool_activity.js` - Tool activity visualization (working correctly)
+- `web/js/extension.js` - Event listeners (working correctly)
+- `backend/server.py` - Message routing (BUG FOUND)
+- `backend/manager.py` - Connection manager (working correctly)
+
+**See:** `notes/pwa/feedback1/debug_analysis.md` for detailed investigation
+
+### Solution Identified ✅
+
+**Change `target='frontend'` to `target='all'` in two functions:**
+
+1. `route_tool_request_to_frontend()` - Line 792 in `backend/server.py`
+2. `route_tool_report_to_frontend()` - Line 847 in `backend/server.py`
+
+**Effect:**
+- Broadcasts tool messages to ALL connections in session (frontend, pwa, mcp)
+- PWA will receive tool activity messages
+- Tool activity cards will display
+- Breadcrumb chain will work
+
+**Status:** Analysis complete, ready to implement fix
+
+---
+
+## 🎉 Feedback Session 1: Image & Screenshot Features (READY TO IMPLEMENT)
+
+### 📝 Documentation Complete
+
+**Investigation Documents:**
+- `notes/pwa/feedback1/feedback.md` - Initial feature requests
+- `notes/pwa/feedback1/investigation.md` - Initial research
+- `notes/pwa/feedback1/debug_analysis.md` - Tool activity debug
+- `notes/pwa/feedback1/deep_investigation.md` - Complete technical analysis
+- **`notes/pwa/feedback1/implementation.md`** - ✅ **READY-TO-PASTE CODE**
+
+### Features Designed
+
+#### 1. Image Serving Endpoint 📄
+**Status:** ✅ Ready to implement
+
+**Summary:**
+- Backend `/api/view` endpoint to serve ComfyUI images
+- Works for both embedded frontend and PWA
+- Proxies ComfyUI output/input/temp folders
+- Path validation and security
+- Same markdown works for all clients
+
+**Files to Modify:**
+- `backend/server.py` - Add endpoint
+
+**Code Location:** `notes/pwa/feedback1/implementation.md` - Phase 1
+
+#### 2. Focus/Fit View Tool 🔍
+**Status:** ✅ Ready to implement
+
+**Summary:**
+- Tool to zoom canvas to specific nodes
+- Uses LiteGraph's `app.canvas.fitNodes()`
+- Prepares for screenshot capture
+- Integrates with existing `select_nodes` tool
+
+**Files to Modify:**
+- `backend/mcp_server.py` - Add MCP tool
+- `web/js/fl_api.js` - Add `fitView()` method
+- `web/js/tool_executor.js` - Add handler
+
+**Code Location:** `notes/pwa/feedback1/implementation.md` - Phase 2
+
+#### 3. Screenshot Tool 📸
+**Status:** ✅ Ready to implement
+
+**Summary:**
+- Capture canvas as JPEG/PNG
+- Base64 encode and send via WebSocket
+- Backend saves to `output/screenshots/`
+- Agent can embed in responses
+- Accessible via `/api/view` endpoint
+
+**Files to Modify:**
+- `backend/models.py` - Add `ScreenshotMessage`
+- `backend/server.py` - Add screenshot handler and routing
+- `backend/mcp_server.py` - Add MCP tool
+- `web/js/fl_api.js` - Add `takeScreenshot()` method
+- `web/js/tool_executor.js` - Add handler
+
+**Code Location:** `notes/pwa/feedback1/implementation.md` - Phase 3
+
+### Combined Workflow Example
+
+```python
+# User: "Show me the upscaling section"
+
+# 1. Find nodes
+result = await query_workflow(
+    filters={"field": "type", "operator": "contains", "value": "upscale"}
+)
+node_ids = [node['id'] for node in result['nodes']]
+
+# 2. Select and focus
+await select_nodes(node_ids=node_ids)
+await focus_on_nodes()
+
+# 3. Screenshot
+screenshot = await take_screenshot(format="jpeg", quality=0.9)
+
+# 4. Return with embedded image
+return f"""Here's the upscaling section:
+
+![Upscaling Section]({screenshot['url']})
+
+This section includes {len(node_ids)} nodes.
+"""
+```
+
+### Implementation Metrics
+
+**Total Code to Add:** ~450 lines  
+**Files to Modify:** 5 files  
+**New Tools:** 2 (focus_on_nodes, take_screenshot)  
+**New Endpoints:** 1 (/api/view)  
+**Estimated Time:** 30-45 minutes implementation + 15-20 minutes testing
+
+**All code is ready in:** `notes/pwa/feedback1/implementation.md`
+
+---
+
 ## ⚠️ Pending Items
 
 ### Icons (Required for Testing)
@@ -213,6 +355,18 @@ System Message:
 - [ ] `web/pwa/icons/icon-maskable.png` (512x512 with safe zone)
 
 **Note:** Placeholder `.gitkeep` file created in `web/pwa/icons/` directory. User will add custom icons.
+
+### Tool Activity Fix (Ready to Implement)
+- [ ] Update `route_tool_request_to_frontend()` to use `target='all'`
+- [ ] Update `route_tool_report_to_frontend()` to use `target='all'`
+- [ ] Test tool activity display in PWA
+
+### Feedback 1 Features (Ready to Implement)
+- [ ] Implement Phase 1: Image Serving Endpoint
+- [ ] Implement Phase 2: Focus Tool
+- [ ] Implement Phase 3: Screenshot Tool
+- [ ] Integration testing
+- [ ] Update agent instructions (optional)
 
 ---
 
@@ -239,12 +393,17 @@ System Message:
 - [ ] Test Ren links in system messages
 - [ ] Test reconnection logic
 - [ ] Test multi-client message routing
+- [ ] Test tool activity display (after fix)
+- [ ] Test image display in PWA (after implementation)
+- [ ] Test screenshot tool (after implementation)
+- [ ] Test focus tool (after implementation)
 
 ### 3.4 Documentation
 - [ ] Update user setup guide with notification instructions
 - [ ] Add troubleshooting section
 - [ ] Create demo video/screenshots
 - [ ] Document notification behavior
+- [ ] Document new image/screenshot features
 
 ---
 
@@ -258,6 +417,10 @@ System Message:
 - [ ] Connect to session
 - [ ] Send messages
 - [ ] Verify agent responses
+- [ ] Verify tool activity cards display (after fix)
+- [ ] Test image display (after implementation)
+- [ ] Test screenshot tool (after implementation)
+- [ ] Test focus tool (after implementation)
 
 ### Mobile Testing (Local Network)
 - [ ] Find local IP: `192.168.x.x`
@@ -272,6 +435,9 @@ System Message:
 - [ ] Tap notification to return to app
 - [ ] Verify system message with Ren links
 - [ ] Test Ren link functionality
+- [ ] Verify tool activity cards display
+- [ ] Test image display
+- [ ] Test screenshot tool
 
 ### Mobile Testing (Remote - ngrok)
 - [ ] Run `ngrok http 8000`
@@ -279,6 +445,9 @@ System Message:
 - [ ] Test over cellular data
 - [ ] Test notifications
 - [ ] Test Ren links
+- [ ] Test tool activity cards
+- [ ] Test images
+- [ ] Test screenshots
 
 ---
 
@@ -301,6 +470,8 @@ System Message:
 - **Notifications:** Only shown when app is backgrounded (uses visibility API)
 - **Event Broadcasting:** Backend broadcasts execution events to PWA clients
 - **Ren Links:** Reused existing ren:// protocol for one-tap actions
+- **Image Serving:** Backend proxy endpoint (not direct ComfyUI access)
+- **Screenshot Flow:** Frontend captures → base64 → WebSocket → backend saves
 
 ### Notification Behavior
 - **Smart Background Detection:** Uses `document.hidden` to detect visibility
@@ -308,6 +479,19 @@ System Message:
 - **Dual Notification:** Browser notification + system message in chat
 - **Ren Links:** One-tap actions like "Show me the output" or "Help me debug"
 - **No Spam:** Only notifies on completion or error, not progress
+
+### Debug Session Insights
+- **Message routing is critical** - Easy to miss target specification
+- **Connection type detection works well** - PWA properly identified
+- **Logging is essential** - Debug logs helped identify routing issue
+- **Tool activity system is solid** - Just needed messages to reach it
+
+### Research Session Insights (Feedback 1)
+- **LiteGraph is well-documented** - `fitNodes()` method perfect for focus tool
+- **Canvas API is straightforward** - `toBlob()` makes screenshots easy
+- **Base64 transfer works well** - WebSocket handles ~500 KB screenshots fine
+- **Backend proxy is elegant** - Same markdown works for all clients
+- **Security is important** - Path validation prevents traversal attacks
 
 ### Potential Improvements (Future)
 - [ ] Session history/favorites
@@ -320,15 +504,43 @@ System Message:
 - [ ] Notification settings (enable/disable per event type)
 - [ ] Badge count on PWA icon
 - [ ] Vibration patterns for different events
+- [ ] Screenshot history/gallery
+- [ ] Annotate screenshots before sending
+- [ ] Video recording of workflow execution
 
 ---
 
 ## 🚀 Next Steps
 
-1. **Add icons** (user will handle this)
-2. **Test Phase 1 & 2** on desktop and mobile
-3. **Begin Phase 3** - Polish and error handling
-4. **Iterate** based on testing feedback
+### Immediate (User Decision)
+
+**Option A: Implement Feedback 1 Features**
+1. Implement Phase 1: Image Serving (~10 min)
+2. Implement Phase 2: Focus Tool (~15 min)
+3. Implement Phase 3: Screenshot Tool (~20 min)
+4. Integration testing (~15 min)
+5. Total: ~60 minutes
+
+**Option B: Fix Tool Activity First**
+1. Fix tool activity routing (~5 min)
+2. Test in PWA (~5 min)
+3. Total: ~10 minutes
+
+**Option C: Add Icons & Test Current Features**
+1. User adds icons
+2. Full testing on desktop and mobile
+3. Address any bugs found
+
+### Short Term
+- Complete pending implementations
+- Full testing suite (desktop + mobile)
+- Bug fixes and polish
+- User documentation
+
+### Long Term
+- Phase 3: Polish & Testing
+- Production deployment considerations
+- Advanced features (voice, video, etc.)
 
 ---
 
@@ -348,12 +560,23 @@ System Message:
 - `web/pwa/app.js` (modified) - Notification handling
 - `web/js/chat_ui.js` (modified) - System message support
 
-**Total Files:** 8 created, 3 modified  
-**Total New Lines:** ~700  
-**Total Reused Lines:** ~2000
+### Debug & Research Files
+- `notes/pwa/feedback1/feedback.md` (created) - Feature requests
+- `notes/pwa/feedback1/investigation.md` (created) - Initial research
+- `notes/pwa/feedback1/debug_analysis.md` (created) - Tool activity debug
+- `notes/pwa/feedback1/deep_investigation.md` (created) - Complete technical analysis
+- **`notes/pwa/feedback1/implementation.md` (created) - ✅ READY-TO-PASTE CODE**
+- `notes/pwa/progress.md` (updated) - This file
+
+**Total Files:** 12 created, 4 modified  
+**Total New Lines (PWA):** ~700  
+**Total Reused Lines:** ~2000  
+**Documentation:** ~6500 lines  
+**Ready-to-Implement Code:** ~450 lines
 
 ---
 
-**Last Updated:** 2025-10-21 19:00  
+**Last Updated:** 2025-10-21 21:00  
 **Updated By:** DevMate  
-**Status:** Phase 2 Complete - Ready for Testing
+**Status:** Phase 2 Complete + Feedback 1 Implementation Ready ✅  
+**Awaiting:** User decision on next implementation step
