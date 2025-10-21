@@ -268,7 +268,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 elif msg_type == "tool_request":
                     # Tool request from MCP subprocess - route to frontend
                     await route_tool_request_to_frontend(session_id, data)
-                
+                                
+                elif msg_type == "tool_report":
+                    # Tool activity report from MCP subprocess - route to frontend
+                    await route_tool_report_to_frontend(session_id, data)
+
                 elif msg_type == "comfy_error":
                     await manager.handle_comfy_error(data.get("data", {}))
                 
@@ -781,7 +785,38 @@ async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
         except Exception as send_error:
             logger.error(f"Failed to send error response: {send_error}")
 
-
+async def route_tool_report_to_frontend(session_id: str, data: dict) -> None:
+    """Route tool activity report from MCP subprocess to frontend.
+    
+    Tool reports are lightweight notifications that a Python-executed tool
+    is running. They don't require a response like tool_request does.
+    
+    Args:
+        session_id: Session ID
+        data: Tool report data containing tool_name and timestamp
+    """
+    try:
+        logger.debug(
+            f"Routing tool report to frontend: session={session_id}, "
+            f"tool={data.get('tool_name')}"
+        )
+        
+        # Check if frontend is connected
+        if not manager.has_connection(session_id, 'frontend'):
+            logger.debug(f"No frontend connection for session {session_id}, skipping tool report")
+            return
+        
+        # Forward the message to frontend
+        result = await manager.send_message(session_id, data, target='frontend')
+        
+        if result:
+            logger.debug(f"✅ Tool report successfully forwarded to frontend for session {session_id}")
+        else:
+            logger.warning(f"❌ Failed to forward tool report to frontend for session {session_id}")
+        
+    except Exception as e:
+        logger.error(f"Error routing tool report: {e}", exc_info=True)
+        
 if __name__ == "__main__":
     import uvicorn
     

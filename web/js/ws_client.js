@@ -162,6 +162,10 @@ class WSClient extends EventEmitter {
                     this.emit('tool_request', message);
                     break;
                     
+                case 'tool_report':
+                    this.emit('tool_report', message);
+                    break;
+
                 case 'typing_indicator':
                     this.emit('typing_indicator', message);
                     break;
