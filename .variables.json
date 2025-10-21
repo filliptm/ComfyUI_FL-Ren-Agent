@@ -1,7 +1,7 @@
 {
   "current_mode": "research",
   "project": "fl_js",
-  "task": "creating implementation plan for PWA",
+  "task": "PWA documentation complete",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
   "focus": "code review then UI update",
@@ -271,5 +271,7 @@
   "notes_path": "notes/sysinfo/",
   "investigation_notes": "notes/tool_activity/investigation.md",
   "implementation_doc": "notes/tool_activity/implementation.md",
-  "implementation_verified": "true"
+  "implementation_verified": "true",
+  "pwa_approach": "minimal chat-focused with smart notifications and ren links",
+  "pwa_name": "Ren Go"
 }
