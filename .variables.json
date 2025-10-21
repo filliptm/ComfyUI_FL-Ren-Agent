@@ -1,10 +1,10 @@
 {
   "current_mode": "implementation",
   "project": "fl_js",
-  "task": "add tool_report handlers to backend and frontend",
+  "task": "add get_system_info to tool_activity.js",
   "architecture": "FastAPI+WS backend with PydanticAI + FastMCP, JS chat sidebar client, realtime tool callbacks",
   "project_status": "new project inspired by legacy FL_JS/FL_WF_Agent",
-  "focus": "file-by-file code modifications and complete implementations",
+  "focus": "code review then UI update",
   "plans_created": "6 detailed implementation plans + summary",
   "next_step": "Phase 2: Adopt Fill improvements - flatten LogicalFilter, update requirements.txt",
   "ui_integration": "app.extensionManager.registerSidebarTab",
@@ -49,7 +49,10 @@
   ],
   "features_designed": "start_button, settings_tab",
   "issue_location": "__init__.py line 33 and server.py line 373",
-  "notes_created": "notes/workflow_sessions/",
+  "notes_created": [
+    "notes/sysinfo/analysis.md",
+    "notes/sysinfo/implementation.md"
+  ],
   "root_cause_hypothesis": "model name gemini-2.0-flash-exp may not be valid or available",
   "root_cause": "tool_report not handled in server.py message router OR ws_client.js switch statement",
   "confidence": "low",
@@ -164,7 +167,7 @@
   "recommended_approach": "Create provider-model mapping abstraction before merge",
   "estimated_loc_change": 15,
   "expected_performance_gain": "90% reduction in multi-message overhead",
-  "implementation_doc_complete": true,
+  "implementation_doc_complete": "true",
   "ready_for_implementation": true,
   "files_to_modify": [
     "backend/mcp_server.py"
@@ -265,7 +268,8 @@
   "error_type": "404 Not Found from Gemini API",
   "workaround": "use openrouter provider",
   "analysis_file": "notes/fill_merge/analysis.md",
-  "notes_path": "notes/tool_activity/tool_name_keys.md",
+  "notes_path": "notes/sysinfo/",
   "investigation_notes": "notes/tool_activity/investigation.md",
-  "implementation_doc": "notes/tool_activity/implementation.md"
+  "implementation_doc": "notes/tool_activity/implementation.md",
+  "implementation_verified": "true"
 }

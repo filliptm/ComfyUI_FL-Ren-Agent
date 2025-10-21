@@ -37,6 +37,7 @@ from comfy_manager import (
     ManagerConnectionError,
     ManagerAPIError
 )
+from sysinfo import get_system_info as _get_system_info
 
 from manager import manager # This is the Connection Manager, not comfy manager :D
 from calc import acalc_batch, CalcBatchParams
@@ -555,6 +556,10 @@ class RandomChoiceRequest(BaseModel):
     """Request to pick random item from list."""
     items: List[Any] = Field(..., description="List of items to choose from")
 
+class GetSystemInfoRequest(BaseModel):
+    """Request for system information."""
+    pass  # No parameters needed
+
 # Error Feedback
 class GetRecentErrorsRequest(BaseModel):
     """Request to get recent execution errors."""
@@ -648,13 +653,13 @@ class NodeLibraryFindCompatibleRequest(BaseModel):
 
 class ManagerSearchNodesRequest(BaseModel):
     """Search for custom node packs in ComfyUI Manager."""
-    query: str = Field(..., description="Search query for node pack name/description/author")
-    node_filter: str = Field(..., description="Regex pattern to filter by node class names (e.g., 'KSampler', 'FL_.*', 'Image.*Saver')")
+    query: Optional[str] = Field(None, description="Search query for node pack name/description/author")
+    node_filter: Optional[str] = Field(None, description="Regex pattern to filter by node class names (e.g., 'KSampler', 'FL_.*', 'Image.*Saver')")
     category: Optional[str] = Field(None, description="Filter by category")
     installed_only: bool = Field(False, description="Only show installed packs")
     updates_available: bool = Field(False, description="Only show packs with updates available")
     mode: Literal["local", "remote", "cache"] = Field("cache", description="Data source mode")
-    max_results: int = Field(20, ge=1, le=100, description="Maximum results to return")
+    max_results: int = Field(16, ge=1, le=100, description="Maximum results to return")
 
 
 class ManagerGetNodeMappingsRequest(BaseModel):
@@ -1146,6 +1151,52 @@ async def generate_int(request: GenerateIntRequest, ctx: Context) -> Dict[str, A
 async def random_choice(request: RandomChoiceRequest, ctx: Context) -> Dict[str, Any]:
     """Pick a random item from a list."""
     return await _execute_tool(ctx, "random_choice", request.model_dump())
+
+@mcp.tool()
+async def get_system_info(request: GetSystemInfoRequest, ctx: Context) -> Dict[str, Any]:
+    """Get system and environment information for installation guidance.
+    
+    This tool provides OS, Python, and virtual environment details to help
+    provide platform-specific installation instructions for ComfyUI components.
+    
+    USE CASES:
+    - Installation Guidance: Determine correct pip/python commands for user's platform
+    - Environment Detection: Check if running in venv/conda for dependency installation
+    - Platform-Specific Help: Provide Windows vs Linux vs macOS specific instructions
+    - ControlNet Setup: Guide users through manual model installation with correct paths
+    - Dependency Installation: Show correct command syntax for user's environment
+    
+    RETURNED INFORMATION:
+    - OS platform (Windows/Linux/Darwin) and architecture
+    - Python version and executable path
+    - Virtual environment status and type (venv/conda/virtualenv)
+    - ComfyUI installation paths
+    - Platform-specific installation command templates
+        
+    SECURITY: Read-only system information, no modifications.
+    """
+    await _report_tool_activity(ctx, "get_system_info")
+    
+    try:
+        # Get ComfyUI tools to include installation paths
+        tools = get_comfy_tools()
+        
+        # Get comprehensive system info
+        info = _get_system_info(comfy_tools=tools)
+        
+        return info
+        
+    except Exception as e:
+        logger.error(f"Error getting system info: {e}")
+        # Still return basic info even if ComfyUI tools fail
+        try:
+            info = _get_system_info(comfy_tools=None)
+            info["warning"] = "ComfyUI paths unavailable"
+            return info
+        except Exception as e2:
+            logger.error(f"Fatal error in get_system_info: {e2}")
+            raise RuntimeError(f"Failed to get system information: {e2}")
+
 
 # ============================================================================
 # COMFYUI EXTENDED TOOLS

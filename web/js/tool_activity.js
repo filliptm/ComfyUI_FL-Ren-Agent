@@ -214,6 +214,11 @@ export const TOOL_CONFIG = {
         label: "Wait",
         description: "Pausing execution for delay"
     },
+    "get_system_info": {
+        icon: "💻",
+        label: "System Info",
+        description: "Checking system and environment details"
+    },
 
     // ComfyUI File Operations
     "comfy_list_folders": {
