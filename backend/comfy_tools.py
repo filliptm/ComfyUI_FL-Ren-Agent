@@ -348,7 +348,7 @@ class ComfyUITools:
         except Exception as e:
             raise ComfyUIError(f"Error searching files: {e}")
 
-    def extract_workflow_from_image(self, image_path: str) -> Optional[Dict[str, Any]]:
+    def extract_workflow_from_image(self, image_path: str) -> dict:
         """Extract ComfyUI workflow from PNG metadata.
         
         Args:
