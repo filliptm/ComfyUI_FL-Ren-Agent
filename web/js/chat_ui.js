@@ -259,9 +259,11 @@ export class ChatUI {
             "What does this workflow do?",
             "Help me build a text-to-image workflow",
             "What nodes do I have for upscaling?",
-            "What models and node packs are missing from this workflow?",
+            "Help me install missing nodes and models",
+            "Show my latest outputs",
+            "Run the workflow a couple times with with variations",
             "My workflow isn't working—can you help debug it?",
-            "How can I organize my nodes better?",
+            "Lets layout this workflow better",
             "Analyze the prompts in the workflow",
             "Make something cool"
         ];
