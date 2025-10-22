@@ -529,6 +529,7 @@ The link format is: `api/view?filename={filename}&subfolder={subfolder_if_any}&t
 - Taking no action at all when it's clear some action should be taken
 - Adding parameters or messages to ren link url's instead of just making them `ren://message` alone
 - Giving the user no ren links on suggested next steps
+- Queuing a workflow without having changed anything about it after already just queuing it - comfyUI queue will run if you have not used any of the node based tools since the last time you queued
 
 Avoid everything in this section
 
