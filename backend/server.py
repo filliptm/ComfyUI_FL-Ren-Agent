@@ -45,7 +45,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),              # Console output
-        logging.FileHandler(log_file, mode="a")  # File output
+        logging.FileHandler(log_file, mode="a", encoding="utf-8")  # File output
     ],
 )
 
@@ -364,12 +364,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             # Message loop
             while True:
                 # 🔍 TRACE: Log before receive
-                logger.info(f"[TRACE] 📥 Waiting for message on session {session_id} ({connection_type})")
+                logger.info(f"[TRACE] Waiting for message on session {session_id} ({connection_type})")
                 
                 data = await websocket.receive_json()
                 
                 # 🔍 TRACE: Log what we received
-                logger.info(f"[TRACE] 📦 Received message on session {session_id} ({connection_type}): type={data.get('type')}")
+                logger.info(f"[TRACE] Received message on session {session_id} ({connection_type}): type={data.get('type')}")
                 
                 # Get message type and session_id for logging
                 msg_type = data.get("type")
@@ -994,9 +994,9 @@ async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
         result = await manager.send_message(session_id, data, target='frontend')
         
         if result:
-            logger.info(f"✅ Tool request successfully forwarded to frontend for session {session_id}")
+            logger.info(f"Tool request successfully forwarded to frontend for session {session_id}")
         else:
-            logger.error(f"❌ Failed to forward tool request to frontend for session {session_id}")
+            logger.error(f"FAILED to forward tool request to frontend for session {session_id}")
         
     except Exception as e:
         logger.error(f"Error routing tool request: {e}", exc_info=True)
@@ -1039,9 +1039,9 @@ async def route_tool_report_to_frontend(session_id: str, data: dict) -> None:
         result = await manager.send_message(session_id, data, target='frontend')
         
         if result:
-            logger.debug(f"✅ Tool report successfully forwarded to frontend for session {session_id}")
+            logger.debug(f"Tool report successfully forwarded to frontend for session {session_id}")
         else:
-            logger.warning(f"❌ Failed to forward tool report to frontend for session {session_id}")
+            logger.warning(f"Failed to forward tool report to frontend for session {session_id}")
         
     except Exception as e:
         logger.error(f"Error routing tool report: {e}", exc_info=True)
