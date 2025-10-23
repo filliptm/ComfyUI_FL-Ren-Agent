@@ -366,9 +366,10 @@ export class FL_API {
                 const targetZoom = Math.min(zoomX, zoomY, 1.0);  // Don't zoom in past 100%
                 
                 // Apply viewport transform
-                canvas.ds.offset[0] = -centerX + canvas.canvas.width / 2 / targetZoom;
-                canvas.ds.offset[1] = -centerY + canvas.canvas.height / 2 / targetZoom;
-                canvas.ds.scale = targetZoom;
+                // canvas.ds.offset[0] = -centerX + canvas.canvas.width / 2 / targetZoom;
+                // canvas.ds.offset[1] = -centerY + canvas.canvas.height / 2 / targetZoom;
+                // canvas.ds.scale = targetZoom;
+                canvas.setZoom(targetZoom, [canvas.canvas.width / 2, canvas.canvas.height / 2]);
             }
             
             // Mark canvas for redraw
