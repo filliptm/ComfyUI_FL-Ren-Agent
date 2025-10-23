@@ -42,7 +42,27 @@ from sysinfo import get_system_info as _get_system_info
 from manager import manager # This is the Connection Manager, not comfy manager :D
 from calc import acalc_batch, CalcBatchParams
 
+# LOGGING
+
+log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
+# Ensure log directory exists (optional)
+os.makedirs("logs", exist_ok=True)
+log_file = "logs/ren_server.log"
+
+# Configure logging to both console and file
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),              # Console output
+        logging.FileHandler(log_file, mode="a")  # File output
+    ],
+)
+
 logger = logging.getLogger("ren_server")
+logger.info(f"Logger initialized with level: {log_level_name}")
 
 
 # ============================================================================
@@ -188,6 +208,8 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[Any]:
     manager_client = None
     manager_available = False
     
+    logger.info(f"FL_MCP_MODE: {os.getenv('FL_MCP_MODE')}")
+    
     try:
         from config import settings
         manager_client = get_comfy_manager_client(
@@ -213,22 +235,25 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[Any]:
         
         logger.info(f"[MCP] Starting in subprocess mode for session: {session_id}")
 
-        # Create once and keep alive across tool calls
-        if _WS_CLIENT is None:
-            _WS_CLIENT = MCPWebSocketClient(session_id, ws_url)
-            await _WS_CLIENT.connect()
-            logger.info("[MCP] WebSocket client connected (persistent)")
-        elif not _WS_CLIENT.connected or (_WS_CLIENT.ws and _WS_CLIENT.ws.closed):
-            # Session exists but not connected (e.g., prior close). No auto-reconnect logic here;
-            # just try to connect once.
-            await _WS_CLIENT.connect()
-            logger.info("[MCP] WebSocket client reconnected (persistent)")
-        
-        yield {
-            "client": _WS_CLIENT,
-            "manager_client": manager_client,
-            "manager_available": manager_available
-        }
+        try:
+            # Create once and keep alive across tool calls
+            if _WS_CLIENT is None:
+                _WS_CLIENT = MCPWebSocketClient(session_id, ws_url)
+                await _WS_CLIENT.connect()
+                logger.info("[MCP] WebSocket client connected (persistent)")
+            elif not _WS_CLIENT.connected or (_WS_CLIENT.ws and _WS_CLIENT.ws.closed):
+                # Session exists but not connected (e.g., prior close). No auto-reconnect logic here;
+                # just try to connect once.
+                await _WS_CLIENT.connect()
+                logger.info("[MCP] WebSocket client reconnected (persistent)")
+            
+            yield {
+                "client": _WS_CLIENT,
+                "manager_client": manager_client,
+                "manager_available": manager_available
+            }
+        except Exception as e:
+            logger.error(f"MCP Initialization Failed: {str(e)}")
 
         # NOTE: no disconnect/teardown here; keep WS open for the process lifetime.
         return

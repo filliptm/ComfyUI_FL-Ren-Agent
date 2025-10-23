@@ -51,9 +51,10 @@ logging.basicConfig(
 
 logger = logging.getLogger("ren_server")
 logger.info(f"Logger initialized with level: {log_level_name}")
+
+
 # Global callback router instance
 callback_router: CallbackRouter | None = None
-
 
 # Background tasks
 async def cleanup_task() -> None:
