@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 import traceback
 from typing import Any, Dict, List, Optional, Set
 import sys
+import os
 from pathlib import Path
 
 # Add parent directory to path to allow 'backend' imports
@@ -29,13 +30,27 @@ from models import (
     ToolResult,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# LOGGING
 
+log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
+# Ensure log directory exists (optional)
+os.makedirs("logs", exist_ok=True)
+log_file = "logs/ren_server.log"
+
+# Configure logging to both console and file
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),              # Console output
+        logging.FileHandler(log_file, mode="a")  # File output
+    ],
+)
+
+logger = logging.getLogger("ren_server")
+logger.info(f"Logger initialized with level: {log_level_name}")
 # Global callback router instance
 callback_router: CallbackRouter | None = None
 

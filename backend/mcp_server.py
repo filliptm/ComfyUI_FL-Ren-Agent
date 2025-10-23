@@ -42,7 +42,7 @@ from sysinfo import get_system_info as _get_system_info
 from manager import manager # This is the Connection Manager, not comfy manager :D
 from calc import acalc_batch, CalcBatchParams
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ren_server")
 
 
 # ============================================================================
