@@ -37,7 +37,7 @@ app.registerExtension({
             
             // Initialize WebSocket client
             wsClient = new WSClient(sessionId, {
-                url: 'ws://localhost:8000/ws',  // TODO: Make configurable
+                url: 'ws://127.0.0.1:8000/ws',  // TODO: Make configurable
                 heartbeatInterval: 30000,
                 maxReconnectAttempts: 5,
             });

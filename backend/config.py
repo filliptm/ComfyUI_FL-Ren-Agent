@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     log_format: Literal["json", "text"] = "json"
 
     # Public URL Configuration (for ngrok/production)
-    public_url: str = "http://localhost:8000"  # Default to localhost
+    public_url: str = "http://127.0.0.1:8000"  # Default to 127.0.0.1
 
     @property
     def resolved_model(self) -> str:

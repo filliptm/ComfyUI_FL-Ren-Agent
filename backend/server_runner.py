@@ -71,7 +71,7 @@ class ServerRunner:
             True if port is in use, False otherwise
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(('localhost', self.port)) == 0
+            return s.connect_ex(('127.0.0.1', self.port)) == 0
     
     def _setup_log_file(self) -> Optional[object]:
         """Setup log file for server output.
