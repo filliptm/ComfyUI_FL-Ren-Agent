@@ -22,6 +22,30 @@ let wsClient = null;
 let toolExecutor = null;
 let diagramGenerator = null;
 
+/**
+ * Fetch client configuration from backend
+ * @returns {Promise<Object>} Configuration object with ws_url
+ */
+async function fetchClientConfig() {
+    try {
+        const response = await fetch('/api/config');
+        if (!response.ok) {
+            throw new Error(`Config fetch failed: ${response.status}`);
+        }
+        const config = await response.json();
+        console.log('[FL_JS] Fetched client config:', config);
+        return config;
+    } catch (error) {
+        console.warn('[FL_JS] Failed to fetch config, using defaults:', error);
+        // Fallback to default port 8000
+        return {
+            ws_url: 'ws://127.0.0.1:8000/ws',
+            version: 'unknown',
+            ngrok_mode: false,
+        };
+    }
+}
+
 app.registerExtension({
     name: "fl_js.agentic_system",
     
@@ -35,9 +59,12 @@ app.registerExtension({
             
             console.log(`[FL_JS] Session ID: ${sessionId}`);
             
-            // Initialize WebSocket client
+            // Fetch configuration from backend
+            const config = await fetchClientConfig();
+            
+            // Initialize WebSocket client with dynamic URL
             wsClient = new WSClient(sessionId, {
-                url: 'ws://127.0.0.1:8000/ws',  // TODO: Make configurable
+                url: config.ws_url,
                 heartbeatInterval: 30000,
                 maxReconnectAttempts: 5,
             });

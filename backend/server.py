@@ -151,6 +151,34 @@ async def health() -> dict[str, Any]:
     }
 
 
+@app.get("/api/config")
+async def get_client_config() -> dict[str, Any]:
+    """Return client configuration including WebSocket URL.
+    
+    This endpoint allows the frontend to dynamically discover the WebSocket URL
+    based on the actual port the backend is running on, enabling users to set
+    custom ports via WS_PORT in .env.
+    
+    Returns:
+        Dict with ws_url and other client configuration
+    """
+    # Build WebSocket URL based on current server configuration
+    # Use settings.ngrok_url if available (production mode)
+    if settings.ngrok_url:
+        ws_url = settings.ngrok_url.replace("https://", "wss://").replace("http://", "ws://")
+        if not ws_url.endswith("/ws"):
+            ws_url = f"{ws_url}/ws"
+    else:
+        # Local mode - use configured host and port
+        ws_url = f"ws://{settings.ws_host}:{settings.ws_port}/ws"
+    
+    return {
+        "ws_url": ws_url,
+        "version": "0.3.0",
+        "ngrok_mode": bool(settings.ngrok_url),
+    }
+
+
 @app.get("/pwa")
 @app.get("/pwa/")
 async def serve_pwa() -> FileResponse:

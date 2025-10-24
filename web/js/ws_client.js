@@ -61,7 +61,13 @@ class WSClient extends EventEmitter {
         // ComfyUI API reference
         this.comfyApi = null;
         
+        // Warn if using default URL (config wasn't provided)
+        if (!config.url) {
+            console.warn('[WSClient] Using default WebSocket URL. Config should be fetched from /api/config');
+        }
+        
         console.log('[WSClient] Initialized with session:', this.sessionId);
+        console.log('[WSClient] WebSocket URL:', this.config.url);
     }
 
     /**
