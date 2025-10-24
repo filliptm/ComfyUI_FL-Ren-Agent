@@ -18,6 +18,7 @@ class ComfyFolderType(str, Enum):
     OUTPUT = "output"
     INPUT = "input"
     TEMP = "temp"
+    WORKFLOWS = "workflows"
 
 
 class ComfyFileInfo(BaseModel):

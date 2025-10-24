@@ -13,43 +13,9 @@ from typing import List, Dict, Optional, Union, Any
 from dataclasses import dataclass
 from enum import Enum
 
+from comfy_models import ComfyFolderType, ComfyFileInfo, ComfySearchResult
+
 logger = logging.getLogger(__name__)
-
-
-class ComfyFolderType(str, Enum):
-    """Supported ComfyUI folder types."""
-    CUSTOM_NODES = "custom_nodes"
-    MODELS = "models"
-    CHECKPOINTS = "checkpoints"
-    LORAS = "loras"
-    VAE = "vae"
-    CONTROLNET = "controlnet"
-    UPSCALE_MODELS = "upscale_models"
-    EMBEDDINGS = "embeddings"
-    OUTPUT = "output"
-    INPUT = "input"
-    TEMP = "temp"
-
-
-@dataclass
-class ComfyFileInfo:
-    """Information about a ComfyUI file or directory."""
-    name: str
-    path: str
-    is_directory: bool
-    size: Optional[int] = None
-    modified_time: Optional[float] = None
-    extension: Optional[str] = None
-
-
-@dataclass
-class ComfySearchResult:
-    """Result from ComfyUI file pattern search."""
-    file_path: str
-    line_number: int
-    line_content: str
-    context_before: List[str]
-    context_after: List[str]
 
 
 class ComfyUIError(Exception):
@@ -94,6 +60,7 @@ class ComfyUITools:
             ComfyFolderType.OUTPUT: "output",
             ComfyFolderType.INPUT: "input",
             ComfyFolderType.TEMP: "temp",
+            ComfyFolderType.WORKFLOWS: "user/default/workflows",
         }
         
         # Safe file extensions for reading

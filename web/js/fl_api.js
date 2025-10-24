@@ -339,7 +339,7 @@ export class FL_API {
                 nodes = app.graph._nodes;
             }
             
-            // FIT NODES USING CORRECT API
+            // FIT NODES
             if (nodes.length > 0){
                 if (nodes.length === 1) // Single node: just center on it
                     canvas.centerOnNode(nodes[0]);
