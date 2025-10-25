@@ -1344,7 +1344,13 @@ async def queue_workflow(request: QueueWorkflowRequest, ctx: Context) -> Dict[st
             "success": False,
             "error": "No prompt_id returned from queue operation",
             "raw_result": r,
-            "suggestion": "This is unexpected. Check that ComfyUI is running and the frontend is connected."
+            "suggestion": (
+                "ComfyUI did not accept the workflow. This can happen when:\n"
+                "1. No parameter in the workflow has changed and ComfyUI is returning cached results (example: you're running on a fixed seed in all ksamplers and trying to queue without changing prompts or setting any other values in any node)\n"
+                "2. ComfyUI rejected the workflow for internal reasons\n\n"
+                "Give the user ren links with options to modify different parameters (like seed, steps, or strength) and queue again or try some other next thing they might do."
+                "Use get_execution_history to check for further errors using the prompt_id."
+            )
         }
 
 
