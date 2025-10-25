@@ -7,6 +7,7 @@
 import SessionManager from '/js/session_manager.js';
 import WSClient from '/js/ws_client.js';
 import { ChatUI } from '/js/chat_ui.js';
+import { getToolConfig } from '/js/tool_activity.js';
 
 class RenPWA {
     constructor() {
@@ -359,6 +360,39 @@ class RenPWA {
         
         this.wsClient.on('execution_error', (data) => {
             this.handleExecutionError(data);
+        });
+        
+        // Listen for tool execution events (for breadcrumb display)
+        this.wsClient.on('tool_request', (message) => {
+            console.log('[RenPWA] Tool request:', message.tool_name);
+            
+            try {
+                const toolConfig = getToolConfig(message.tool_name);
+                this.chatUI?.startToolInChain(
+                    message.tool_name,
+                    toolConfig.icon,
+                    toolConfig.label
+                );
+            } catch (error) {
+                console.warn('[RenPWA] Could not start tool in breadcrumb chain:', error);
+            }
+        });
+        
+        this.wsClient.on('tool_report', (message) => {
+            console.log('[RenPWA] Tool report:', message.tool_name);
+            
+            try {
+                const toolConfig = getToolConfig(message.tool_name);
+                this.chatUI?.startToolInChain(
+                    message.tool_name,
+                    toolConfig.icon,
+                    toolConfig.label
+                );
+                // Mark as complete immediately for Python-only tools
+                this.chatUI?.completeToolInChain(message.tool_name);
+            } catch (error) {
+                console.warn('[RenPWA] Could not add tool to breadcrumb chain:', error);
+            }
         });
     }
     
