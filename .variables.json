@@ -113,7 +113,7 @@
       }
     ]
   },
-  "focus": "Updating mcp_server.py tool descriptions to mention extra_model_paths support",
+  "focus": "Added 7 new folder types to enum",
   "last_investigation": "queue_delete",
   "investigation_depth": "design_complete",
   "current_investigation": "extra_model_paths",
@@ -123,8 +123,8 @@
   "confidence": "HIGH",
   "recommendation": "Proceed with implementation - clear path forward with medium complexity",
   "files_modified": [
-    "backend/comfy_tools.py",
-    "requirements.txt"
+    "backend/comfy_models.py",
+    "backend/path_resolver.py"
   ],
   "lines_changed": 50,
   "status": "ready for testing",
@@ -143,5 +143,14 @@
     "Write integration tests",
     "Test with real YAML",
     "Update documentation"
+  ],
+  "new_folder_types": [
+    "CLIP",
+    "CLIP_VISION",
+    "CONFIGS",
+    "DIFFUSION_MODELS",
+    "HYPERNETWORKS",
+    "GLIGEN",
+    "UNET"
   ]
 }
