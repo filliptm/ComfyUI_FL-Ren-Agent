@@ -1010,7 +1010,7 @@ async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
         has_pwa = manager.has_connection(session_id, 'pwa')
         
         if not has_frontend and not has_pwa:
-            error_msg = f"No display clients connected for session {session_id}.\n\n**What to do**\n- Ask the user to make sure they have ComfyUI open in their browser\- If they do not see your reply in the ComfyUI Ren side drawer it means they are connected to the wrong session.\n- Tell them if they are on the Ren Go app they can refresh the page to choose a session"
+            error_msg = f"No display clients connected for session {session_id}.\n\n**What to do**\n- Ask the user to make sure they have ComfyUI open in their browser\n- If they do not see your reply in the ComfyUI Ren side drawer it means they are connected to the wrong session.\n- Tell them if they are on the Ren Go app they can refresh the page to choose a session"
             logger.error(error_msg)
             
             # Send error back to MCP subprocess
