@@ -31,9 +31,13 @@ KEY_FIELDS = {
 
 MODEL_OPTIONS = {
     "cloud": [
-        {"id": "claude-3-5-sonnet-20241022", "label": "Claude 3.5 Sonnet"},
-        {"id": "claude-3-5-haiku-20241022", "label": "Claude 3.5 Haiku"},
-        {"id": "claude-3-opus-20240229", "label": "Claude 3 Opus"},
+        {"id": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
+        {"id": "claude-opus-4-7", "label": "Claude Opus 4.7"},
+        {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
+        {"id": "claude-sonnet-4-5-20250929", "label": "Claude Sonnet 4.5"},
+        {"id": "claude-opus-4-1-20250805", "label": "Claude Opus 4.1"},
+        {"id": "claude-opus-4-20250514", "label": "Claude Opus 4"},
+        {"id": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4"},
     ],
     "openrouter": [
         {"id": "anthropic/claude-sonnet-4.5", "label": "Claude Sonnet 4.5"},
@@ -54,6 +58,17 @@ MODEL_OPTIONS = {
         {"id": "gpt-4-turbo-preview", "label": "GPT-4 Turbo"},
         {"id": "o1-preview", "label": "o1 Preview"},
     ],
+}
+
+CLOUD_MODEL_IDS = {option["id"] for option in MODEL_OPTIONS["cloud"]}
+CLOUD_MODEL_MIGRATIONS = {
+    "claude-3-5-sonnet-20241022": "claude-sonnet-4-6",
+    "claude-3-5-sonnet-latest": "claude-sonnet-4-6",
+    "claude-3-7-sonnet-20250219": "claude-sonnet-4-6",
+    "claude-3-opus-20240229": "claude-opus-4-7",
+    "claude-3-opus-latest": "claude-opus-4-7",
+    "claude-3-5-haiku-20241022": "claude-haiku-4-5-20251001",
+    "claude-3-haiku-20240307": "claude-haiku-4-5-20251001",
 }
 
 
@@ -99,6 +114,11 @@ def load_config() -> Dict[str, Any]:
             pass
     if isinstance(config.get("models"), dict):
         config["models"].pop("anthropic", None)
+        cloud_model = config["models"].get("cloud")
+        cloud_model = CLOUD_MODEL_MIGRATIONS.get(cloud_model, cloud_model)
+        if cloud_model not in CLOUD_MODEL_IDS:
+            cloud_model = get_default_model("anthropic")
+        config["models"]["cloud"] = cloud_model
     if isinstance(config.get("keys"), dict):
         config["keys"].pop("anthropic", None)
     return config

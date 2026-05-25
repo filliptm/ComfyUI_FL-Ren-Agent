@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # Default model for each provider
 DEFAULT_MODELS: Dict[str, str] = {
     "openai": "gpt-4-turbo-preview",
-    "anthropic": "claude-3-5-sonnet-20241022",
+    "anthropic": "claude-sonnet-4-6",
     "gemini": "gemini-2.0-flash-exp",
     "openrouter": "anthropic/claude-sonnet-4.5",
     "local": "local-model"
