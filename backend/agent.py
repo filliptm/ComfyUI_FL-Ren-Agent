@@ -17,8 +17,11 @@ from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from anthropic import AsyncAnthropic
 
 from config import settings
+from auth_service import auth_service
+import provider_config
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +161,16 @@ def get_llm_model():
     elif settings.llm_provider == "anthropic":
         from pydantic_ai.models.anthropic import AnthropicModel
         from pydantic_ai.providers.anthropic import AnthropicProvider
+        if provider_config.current_provider() == "cloud":
+            access_token = auth_service.get_access_token()
+            if not access_token:
+                raise ValueError("Not authenticated. Connect to Claude first.")
+            return AnthropicModel(
+                model_name,
+                provider=AnthropicProvider(
+                    anthropic_client=AsyncAnthropic(auth_token=access_token)
+                )
+            )
         return AnthropicModel(
             model_name,
             provider=AnthropicProvider(api_key=settings.anthropic_api_key or None)

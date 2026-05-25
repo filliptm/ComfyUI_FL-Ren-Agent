@@ -11,7 +11,7 @@
 import { MessageBubble } from './_components/MessageBubble.js';
 
 const PROVIDERS = [
-    { id: 'anthropic', label: 'Claude' },
+    { id: 'cloud', label: 'Claude' },
     { id: 'openrouter', label: 'Router' },
     { id: 'local', label: 'Local' },
     { id: 'gemini', label: 'Gemini' },
@@ -40,6 +40,8 @@ export class ChatUI {
         this.streamingAssistantText = '';
         this.providerStatus = null;
         this.localModelOptions = [];
+        this.authStep = 'initial';
+        this.pendingOAuthState = null;
 
         // Initialize message bubble renderer
         this.messageBubble = new MessageBubble();
@@ -509,6 +511,49 @@ export class ChatUI {
             return;
         }
 
+        if (provider === 'cloud') {
+            const status = this.providerStatus.providers?.cloud || {};
+            if (status.authenticated) {
+                this.providerSetup.innerHTML = `
+                    <div class="fl-provider-row">
+                        <span class="fl-provider-note">Claude connected with OAuth.</span>
+                        <button class="fl-provider-action" id="fl-cloud-signout" type="button">Sign out</button>
+                    </div>
+                `;
+                this.providerSetup.querySelector('#fl-cloud-signout').addEventListener('click', () => this._signOutClaude());
+                return;
+            }
+
+            if (this.authStep === 'paste-code') {
+                this.providerSetup.innerHTML = `
+                    <div class="fl-provider-note">A browser window opened. Paste the authorization code here.</div>
+                    <div class="fl-provider-row">
+                        <input class="fl-provider-input" id="fl-cloud-code" placeholder="Paste code here..." />
+                        <button class="fl-provider-action primary" id="fl-cloud-submit" type="button">Submit</button>
+                    </div>
+                    <button class="fl-provider-action" id="fl-cloud-cancel" type="button">Cancel</button>
+                `;
+                this.providerSetup.querySelector('#fl-cloud-submit').addEventListener('click', () => this._submitClaudeCode());
+                this.providerSetup.querySelector('#fl-cloud-cancel').addEventListener('click', () => {
+                    this.authStep = 'initial';
+                    this._renderProviderSetup();
+                });
+                return;
+            }
+
+            if (this.authStep === 'exchanging') {
+                this.providerSetup.innerHTML = `<div class="fl-provider-note">Authenticating...</div>`;
+                return;
+            }
+
+            this.providerSetup.innerHTML = `
+                <div class="fl-provider-note">Sign in with your Anthropic account to use Claude.</div>
+                <button class="fl-provider-action primary" id="fl-cloud-connect" type="button">Connect with Claude</button>
+            `;
+            this.providerSetup.querySelector('#fl-cloud-connect').addEventListener('click', () => this._startClaudeOAuth());
+            return;
+        }
+
         const label = PROVIDERS.find((item) => item.id === provider)?.label || provider;
         this.providerSetup.innerHTML = `
             <div class="fl-provider-row">
@@ -528,6 +573,74 @@ export class ChatUI {
             this._renderProviderControls();
         } catch (error) {
             this.addMessage('error', `Failed to save provider key: ${error.message}`);
+        }
+    }
+
+    async _startClaudeOAuth() {
+        try {
+            const response = await fetch(`${this.chatClient.baseUrl}/api/auth/start-oauth`);
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || data.error || 'Failed to start OAuth');
+            }
+            this.pendingOAuthState = data.state;
+            window.open(data.authorizationUrl, '_blank');
+            this.authStep = 'paste-code';
+            this._renderProviderSetup();
+        } catch (error) {
+            this.addMessage('error', `Failed to start Claude login: ${error.message}`);
+        }
+    }
+
+    async _submitClaudeCode() {
+        const input = this.providerSetup.querySelector('#fl-cloud-code');
+        const pasted = input?.value?.trim();
+        if (!pasted || !this.pendingOAuthState) return;
+
+        const parts = pasted.split('#');
+        const code = parts[0].trim();
+        const callbackState = parts[1]?.trim() || '';
+        this.authStep = 'exchanging';
+        this._renderProviderSetup();
+
+        try {
+            const response = await fetch(`${this.chatClient.baseUrl}/api/auth/exchange-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code,
+                    callbackState,
+                    state: this.pendingOAuthState,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || data.error || 'Authentication failed');
+            }
+            this.pendingOAuthState = null;
+            this.authStep = 'initial';
+            this.providerStatus = await this.chatClient.providerStatus();
+            this._renderProviderControls();
+        } catch (error) {
+            this.authStep = 'paste-code';
+            this.addMessage('error', `Claude login failed: ${error.message}`);
+            this._renderProviderSetup();
+        }
+    }
+
+    async _signOutClaude() {
+        try {
+            const response = await fetch(`${this.chatClient.baseUrl}/api/auth/sign-out`, {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || data.error || 'Failed to sign out');
+            }
+            this.providerStatus = await this.chatClient.providerStatus();
+            this._renderProviderControls();
+        } catch (error) {
+            this.addMessage('error', `Failed to sign out of Claude: ${error.message}`);
         }
     }
 

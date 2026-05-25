@@ -30,6 +30,7 @@ from manager import manager
 from callback_router import CallbackRouter, current_session_id
 from agent import agent_manager
 import provider_config
+from auth_service import auth_service
 from chat_broadcaster import ChatBroadcaster, StreamHandle, SubscribeResult
 from models import (
     Handshake,
@@ -226,6 +227,55 @@ async def get_client_config() -> dict[str, Any]:
 @app.get("/api/providers/status")
 async def get_provider_status() -> Dict[str, Any]:
     return provider_config.status()
+
+
+@app.get("/api/auth/start-oauth")
+async def start_oauth() -> JSONResponse:
+    try:
+        return JSONResponse(auth_service.start_oauth())
+    except Exception as e:
+        return JSONResponse(
+            {"error": "Failed to start OAuth", "message": str(e)},
+            status_code=500,
+        )
+
+
+@app.post("/api/auth/exchange-code")
+async def exchange_oauth_code(request: Request) -> JSONResponse:
+    data = await request.json()
+    code = str(data.get("code") or "").strip()
+    callback_state = str(data.get("callbackState") or "")
+    state = str(data.get("state") or "")
+    if not code or not state:
+        return JSONResponse({"error": "code and state are required"}, status_code=400)
+    try:
+        result = await auth_service.exchange_code(code, callback_state, state)
+        provider_config.select_provider("cloud")
+        agent_manager.clear_all()
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse(
+            {"error": "Authentication failed", "message": str(e)},
+            status_code=401,
+        )
+
+
+@app.get("/api/auth/status")
+async def get_auth_status() -> Dict[str, Any]:
+    return auth_service.get_status()
+
+
+@app.post("/api/auth/sign-out")
+async def sign_out() -> JSONResponse:
+    try:
+        auth_service.sign_out()
+        agent_manager.clear_all()
+        return JSONResponse({"success": True})
+    except Exception as e:
+        return JSONResponse(
+            {"error": "Failed to sign out", "message": str(e)},
+            status_code=500,
+        )
 
 
 @app.post("/api/providers/select")
@@ -518,6 +568,9 @@ async def _run_agent_for_sse(
             "blockType": "text",
         })
 
+        if provider_config.current_provider() == "cloud":
+            await auth_service.get_valid_access_token()
+
         agent = agent_manager.get_agent(session_id)
 
         async with agent.run_mcp_servers():
@@ -802,15 +855,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await handle_screenshot(session_id, data)
 
             elif msg_type == "comfy_error":
-                await manager.handle_comfy_error(data.get("data", {}))
+                await manager.handle_comfy_error(data.get("data") or {})
 
             elif msg_type == "queue_status":
-                await manager.handle_queue_status(data.get("data", {}))
+                await manager.handle_queue_status(data.get("data") or {})
 
             elif msg_type == "execution_event":
                 event = data.get("event")
                 logger.debug(f"**execution_event**: {data}")
-                event_data = data.get("data", {})
+                event_data = data.get("data") or {}
                 await manager.handle_execution_event(event, event_data)
 
             else:

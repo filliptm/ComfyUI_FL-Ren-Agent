@@ -733,6 +733,14 @@
     border-color: rgba(153, 102, 217, 0.7);
 }
 
+.fl-provider-note {
+    min-width: 0;
+    flex: 1;
+    color: #9b9ba3;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
 .fl-provider-action {
     height: 30px;
     padding: 0 10px;

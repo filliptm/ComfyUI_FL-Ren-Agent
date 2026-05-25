@@ -19,16 +19,18 @@ PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / ".ren"
 CONFIG_FILE = CONFIG_DIR / "provider_config.json"
 
-PROVIDERS = ("anthropic", "openrouter", "local", "gemini", "openai")
+from auth_service import auth_service
+
+
+PROVIDERS = ("cloud", "openrouter", "local", "gemini", "openai")
 KEY_FIELDS = {
-    "anthropic": "anthropic_api_key",
     "openrouter": "openrouter_api_key",
     "gemini": "google_api_key",
     "openai": "openai_api_key",
 }
 
 MODEL_OPTIONS = {
-    "anthropic": [
+    "cloud": [
         {"id": "claude-3-5-sonnet-20241022", "label": "Claude 3.5 Sonnet"},
         {"id": "claude-3-5-haiku-20241022", "label": "Claude 3.5 Haiku"},
         {"id": "claude-3-opus-20240229", "label": "Claude 3 Opus"},
@@ -57,7 +59,7 @@ MODEL_OPTIONS = {
 
 def _default_config() -> Dict[str, Any]:
     models = {
-        "anthropic": get_default_model("anthropic"),
+        "cloud": get_default_model("anthropic"),
         "openrouter": get_default_model("openrouter"),
         "gemini": get_default_model("gemini"),
         "openai": get_default_model("openai"),
@@ -67,7 +69,7 @@ def _default_config() -> Dict[str, Any]:
         models[settings.llm_provider] = settings.llm_model
 
     return {
-        "provider": settings.llm_provider,
+        "provider": "cloud" if settings.llm_provider == "anthropic" else settings.llm_provider,
         "models": models,
         "keys": {},
         "local": {
@@ -84,9 +86,21 @@ def load_config() -> Dict[str, Any]:
         try:
             saved = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
             if isinstance(saved, dict):
+                if saved.get("provider") == "anthropic":
+                    saved["provider"] = "cloud"
+                if isinstance(saved.get("models"), dict):
+                    if "cloud" not in saved["models"] and "anthropic" in saved["models"]:
+                        saved["models"]["cloud"] = saved["models"]["anthropic"]
+                    saved["models"].pop("anthropic", None)
+                if isinstance(saved.get("keys"), dict):
+                    saved["keys"].pop("anthropic", None)
                 _deep_update(config, saved)
         except Exception:
             pass
+    if isinstance(config.get("models"), dict):
+        config["models"].pop("anthropic", None)
+    if isinstance(config.get("keys"), dict):
+        config["keys"].pop("anthropic", None)
     return config
 
 
@@ -117,15 +131,19 @@ def apply_to_settings() -> Dict[str, Any]:
     if provider not in PROVIDERS:
         provider = settings.llm_provider
 
-    settings.llm_provider = provider
     models = config.get("models") or {}
 
     if provider == "local":
+        settings.llm_provider = "local"
         local = config.get("local") or {}
         settings.local_llm_url = local.get("baseURL") or settings.local_llm_url
         settings.local_api_key = local.get("apiKey") or settings.local_api_key or "local"
         settings.llm_model = local.get("model") or None
+    elif provider == "cloud":
+        settings.llm_provider = "anthropic"
+        settings.llm_model = models.get("cloud") or get_default_model("anthropic")
     else:
+        settings.llm_provider = provider
         settings.llm_model = models.get(provider) or get_default_model(provider)
 
     keys = config.get("keys") or {}
@@ -135,6 +153,12 @@ def apply_to_settings() -> Dict[str, Any]:
             setattr(settings, field, saved_key)
 
     return config
+
+
+def current_provider() -> str:
+    config = load_config()
+    provider = config.get("provider")
+    return provider if provider in PROVIDERS else "cloud"
 
 
 def select_provider(provider: str, model: Optional[str] = None) -> Dict[str, Any]:
@@ -208,7 +232,8 @@ def status() -> Dict[str, Any]:
     config = apply_to_settings()
     keys = config.get("keys") or {}
     local = config.get("local") or {}
-    provider = config.get("provider") if config.get("provider") in PROVIDERS else settings.llm_provider
+    provider = config.get("provider") if config.get("provider") in PROVIDERS else current_provider()
+    auth_status = auth_service.get_status()
 
     def configured(key_provider: str, env_value: str = "") -> bool:
         return bool(keys.get(key_provider) or env_value)
@@ -219,9 +244,11 @@ def status() -> Dict[str, Any]:
         "models": config.get("models") or {},
         "modelOptions": MODEL_OPTIONS,
         "providers": {
-            "anthropic": {
-                "configured": configured("anthropic", settings.anthropic_api_key),
-                "keyPreview": _mask(keys.get("anthropic") or settings.anthropic_api_key),
+            "cloud": {
+                "configured": bool(auth_status.get("authenticated")),
+                "authenticated": bool(auth_status.get("authenticated")),
+                "method": auth_status.get("method"),
+                "expiresAt": auth_status.get("expiresAt"),
             },
             "openrouter": {
                 "configured": configured("openrouter", settings.openrouter_api_key),
