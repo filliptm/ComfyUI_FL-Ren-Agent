@@ -43,7 +43,7 @@ class WSClient extends EventEmitter {
         
         // Configuration
         this.config = {
-            url: config.url || 'ws://localhost:8000/ws',
+            url: config.url || 'ws://127.0.0.1:8000/ws',
             maxReconnectAttempts: config.maxReconnectAttempts || 5,
             initialReconnectDelay: config.initialReconnectDelay || 1000, // 1 second
             maxReconnectDelay: config.maxReconnectDelay || 30000, // 30 seconds
@@ -61,7 +61,13 @@ class WSClient extends EventEmitter {
         // ComfyUI API reference
         this.comfyApi = null;
         
+        // Warn if using default URL (config wasn't provided)
+        if (!config.url) {
+            console.warn('[WSClient] Using default WebSocket URL. Config should be fetched from /api/config');
+        }
+        
         console.log('[WSClient] Initialized with session:', this.sessionId);
+        console.log('[WSClient] WebSocket URL:', this.config.url);
     }
 
     /**

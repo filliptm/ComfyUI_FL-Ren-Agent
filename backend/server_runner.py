@@ -1,6 +1,7 @@
 """Backend server subprocess manager for FL_JS.
 
 Handles automatic startup, monitoring, and cleanup of the FastAPI backend server.
+Supports multiple launch modes: terminal window, subprocess, or manual.
 """
 
 import sys
@@ -11,18 +12,19 @@ import socket
 import time
 import threading
 import logging
-from typing import Optional
+from typing import Optional, Literal
 from pathlib import Path
 
 
 class ServerRunner:
-    """Manages FL_JS FastAPI backend server subprocess.
+    """Manages FL_JS FastAPI backend server.
     
     Features:
+    - Multiple launch modes (terminal/subprocess/manual)
     - Automatic startup when ComfyUI loads
     - Port conflict detection
     - Health check with timeout
-    - Auto-restart on crash
+    - Auto-restart on crash (subprocess mode)
     - Graceful shutdown on exit
     - Dual logging (file + stdout)
     """
@@ -31,6 +33,7 @@ class ServerRunner:
         self,
         backend_dir: str,
         port: int = 8000,
+        launch_mode: Literal["auto", "terminal", "subprocess", "manual"] = "auto",
         auto_start: bool = True,
         auto_restart: bool = True,
         log_to_file: bool = True,
@@ -40,15 +43,21 @@ class ServerRunner:
         Args:
             backend_dir: Path to backend directory containing server.py
             port: Port to run server on
+            launch_mode: How to launch backend (auto/terminal/subprocess/manual)
             auto_start: Whether to start server immediately
-            auto_restart: Whether to restart server if it crashes
-            log_to_file: Whether to log server output to file
+            auto_restart: Whether to restart server if it crashes (subprocess only)
+            log_to_file: Whether to log server output to file (subprocess only)
         """
         self.backend_dir = Path(backend_dir).resolve()
         self.port = port
+        self.launch_mode = launch_mode
         self.auto_restart = auto_restart
         self.log_to_file = log_to_file
         
+        # Track which mode was actually used
+        self.active_mode: Optional[str] = None
+        
+        # Subprocess tracking (only used in subprocess mode)
         self.process: Optional[subprocess.Popen] = None
         self.log_file_handle: Optional[object] = None
         self._cleaned_up = False
@@ -58,10 +67,10 @@ class ServerRunner:
         # Setup logging
         self.logger = logging.getLogger("FL_JS.ServerRunner")
         
-        # Register cleanup handlers
+        # Register cleanup handlers (only needed for subprocess mode)
         atexit.register(self.cleanup)
         
-        if auto_start:
+        if auto_start and launch_mode != "manual":
             self.start()
     
     def is_port_in_use(self) -> bool:
@@ -71,7 +80,7 @@ class ServerRunner:
             True if port is in use, False otherwise
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(('localhost', self.port)) == 0
+            return s.connect_ex(('127.0.0.1', self.port)) == 0
     
     def _setup_log_file(self) -> Optional[object]:
         """Setup log file for server output.
@@ -110,8 +119,9 @@ class ServerRunner:
         Returns:
             True if started successfully, False otherwise
         """
+        # Check if already running (subprocess mode)
         if self.process is not None:
-            print("[FL_JS] Backend already running")
+            print("[FL_JS] Backend already running (subprocess)")
             return True
         
         # Check port availability
@@ -121,6 +131,89 @@ class ServerRunner:
             print(f"[FL_JS] Otherwise, change WS_PORT in .env or stop the conflicting service.")
             return False
         
+        # Determine launch method
+        if self.launch_mode == "manual":
+            print("[FL_JS] Manual launch mode - not starting backend")
+            print("[FL_JS] To start manually: cd backend && python server.py")
+            return False
+        
+        elif self.launch_mode == "terminal":
+            return self._launch_in_terminal(fallback=False)
+        
+        elif self.launch_mode == "subprocess":
+            return self._launch_as_subprocess()
+        
+        elif self.launch_mode == "auto":
+            # Try terminal first, fallback to subprocess
+            return self._launch_in_terminal(fallback=True)
+        
+        else:
+            print(f"[FL_JS] Unknown launch mode: {self.launch_mode}")
+            return False
+    
+    def _launch_in_terminal(self, fallback: bool = True) -> bool:
+        """Launch backend in separate terminal window.
+        
+        Args:
+            fallback: If True, fallback to subprocess on failure
+        
+        Returns:
+            True if started successfully, False otherwise
+        """
+        print(f"[FL_JS] Attempting to launch backend in terminal window...")
+        
+        # Import here to avoid import errors if module doesn't exist
+        try:
+            from backend.terminal_launcher import TerminalLauncher
+        except ImportError as e:
+            print(f"[FL_JS] Terminal launcher not available: {e}")
+            if fallback:
+                print("[FL_JS] Falling back to subprocess mode...")
+                return self._launch_as_subprocess()
+            return False
+        
+        # Create launcher
+        launcher = TerminalLauncher(
+            backend_dir=self.backend_dir,
+            python_exe=sys.executable,
+            port=self.port,
+        )
+        
+        # Try to launch
+        success, message = launcher.launch()
+        
+        if success:
+            print(f"[FL_JS] {message}")
+            print(f"[FL_JS] Backend starting on port {self.port}...")
+            print(f"[FL_JS] Check the terminal window for logs")
+            print(f"[FL_JS] Close the terminal window to stop the backend")
+            
+            self.active_mode = "terminal"
+            
+            # Wait for server to be ready
+            if self.wait_for_server(timeout=15):
+                print(f"[FL_JS] Backend server started successfully!")
+                return True
+            else:
+                print("[FL_JS] Backend server failed to start (timeout)")
+                print("[FL_JS] Check the terminal window for errors")
+                return False
+        
+        else:
+            print(f"[FL_JS] Terminal launch failed: {message}")
+            
+            if fallback:
+                print("[FL_JS] Falling back to subprocess mode...")
+                return self._launch_as_subprocess()
+            else:
+                return False
+    
+    def _launch_as_subprocess(self) -> bool:
+        """Launch backend as managed subprocess.
+        
+        Returns:
+            True if started successfully, False otherwise
+        """
         try:
             # Use same Python as ComfyUI
             python_exe = sys.executable
@@ -131,7 +224,7 @@ class ServerRunner:
                 print(f"[FL_JS] Backend directory: {self.backend_dir}")
                 return False
             
-            print(f"[FL_JS] Starting backend server on port {self.port}...")
+            print(f"[FL_JS] Starting backend server (subprocess mode) on port {self.port}...")
             
             # Setup log file
             self.log_file_handle = self._setup_log_file()
@@ -139,7 +232,6 @@ class ServerRunner:
             # Determine stdout/stderr
             if self.log_file_handle:
                 # Dual output: file + inherited stdout
-                # We'll use Tee-like behavior via threading
                 stdout_dest = subprocess.PIPE
                 stderr_dest = subprocess.STDOUT
             else:
@@ -156,6 +248,8 @@ class ServerRunner:
                 bufsize=1,  # Line buffered
                 universal_newlines=True,
             )
+            
+            self.active_mode = "subprocess"
             
             # If logging to file, start output capture thread
             if self.log_file_handle and self.process.stdout:
@@ -261,7 +355,7 @@ class ServerRunner:
                 time.sleep(2)
                 
                 # Restart
-                if not self.start():
+                if not self._launch_as_subprocess():
                     print("[FL_JS] Restart failed. Will retry on next check.")
                 else:
                     print("[FL_JS] Backend restarted successfully")
@@ -286,8 +380,8 @@ class ServerRunner:
                 print(" Ready!")
                 return True
             
-            # Check if process crashed during startup
-            if self.process and self.process.poll() is not None:
+            # Check if process crashed during startup (subprocess mode only)
+            if self.active_mode == "subprocess" and self.process and self.process.poll() is not None:
                 print(" Failed!")
                 print(f"[FL_JS] Process terminated during startup (exit code: {self.process.poll()})")
                 return False
@@ -299,7 +393,7 @@ class ServerRunner:
         return False
     
     def cleanup(self):
-        """Terminate the backend server process."""
+        """Terminate the backend server process (subprocess mode only)."""
         if self._cleaned_up:
             return
         
@@ -308,7 +402,8 @@ class ServerRunner:
         # Stop monitoring
         self._should_monitor = False
         
-        if self.process is not None:
+        # Only cleanup subprocess if we launched in subprocess mode
+        if self.active_mode == "subprocess" and self.process is not None:
             try:
                 print(f"[FL_JS] Terminating backend server (PID: {self.process.pid})...")
                 
@@ -331,7 +426,12 @@ class ServerRunner:
             finally:
                 self.process = None
         
-        # Close log file
+        elif self.active_mode == "terminal":
+            # No cleanup needed for terminal mode
+            print("[FL_JS] Terminal mode - no cleanup needed")
+            print("[FL_JS] Close the terminal window to stop the backend")
+        
+        # Close log file (subprocess mode only)
         if self.log_file_handle:
             try:
                 self.log_file_handle.write(f"\n{'='*80}\n")

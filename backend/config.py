@@ -24,13 +24,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # === Backend Auto-Start ===
+    # === Backend Launch Configuration ===
+    backend_launch_mode: Literal["auto", "terminal", "subprocess", "manual"] = "auto"
     auto_start_backend: bool = True
-    auto_restart_backend: bool = True
-    log_backend_to_file: bool = True
+    auto_restart_backend: bool = True  # Only applies to subprocess mode
+    log_backend_to_file: bool = True   # Only applies to subprocess mode
 
     # LLM Provider Configuration
     llm_provider: Literal["openai", "anthropic", "gemini", "openrouter"] = "gemini"
+    local_llm_url: Optional[str] = None # For use with local hosting like ollama or vllm
     llm_model: Optional[str] = None  # If None, uses provider default
     llm_temperature: float = 0.7
     llm_max_tokens: int = 32000
@@ -40,9 +42,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_api_key: str = ""
     openrouter_api_key: str = ""
+    local_api_key: str = ""
 
     # WebSocket Settings
-    ws_host: str = "0.0.0.0"
+    ws_host: str = "127.0.0.1"
     ws_port: int = 8000
     ws_heartbeat_interval: int = 30
     ws_session_timeout: int = 300
@@ -68,7 +71,7 @@ class Settings(BaseSettings):
     log_format: Literal["json", "text"] = "json"
 
     # Public URL Configuration (for ngrok/production)
-    public_url: str = "http://localhost:8000"  # Default to localhost
+    public_url: str = "http://127.0.0.1:8000"  # Default to 127.0.0.1
 
     @property
     def resolved_model(self) -> str:

@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 import traceback
 from typing import Any, Dict, List, Optional, Set
 import sys
+import os
 from pathlib import Path
 
 # Add parent directory to path to allow 'backend' imports
@@ -29,16 +30,31 @@ from models import (
     ToolResult,
 )
 
-# Configure logging
+# LOGGING
+
+log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
+# Ensure log directory exists (optional)
+os.makedirs("logs", exist_ok=True)
+log_file = "logs/ren_server.log"
+
+# Configure logging to both console and file
 logging.basicConfig(
-    level=getattr(logging, settings.log_level),
+    level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),              # Console output
+        logging.FileHandler(log_file, mode="a", encoding="utf-8")  # File output
+    ],
 )
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger("ren_server")
+logger.info(f"Logger initialized with level: {log_level_name}")
+
 
 # Global callback router instance
 callback_router: CallbackRouter | None = None
-
 
 # Background tasks
 async def cleanup_task() -> None:
@@ -132,6 +148,34 @@ async def health() -> dict[str, Any]:
         "total_sessions": manager.get_total_session_count(),
         "pending_callbacks": callback_router.get_pending_count() if callback_router else 0,
         "active_agents": agent_manager.get_agent_count(),
+    }
+
+
+@app.get("/api/config")
+async def get_client_config() -> dict[str, Any]:
+    """Return client configuration including WebSocket URL.
+    
+    This endpoint allows the frontend to dynamically discover the WebSocket URL
+    based on the actual port the backend is running on, enabling users to set
+    custom ports via WS_PORT in .env.
+    
+    Returns:
+        Dict with ws_url and other client configuration
+    """
+    # Build WebSocket URL based on current server configuration
+    # Use settings.ngrok_url if available (production mode)
+    if settings.ngrok_url:
+        ws_url = settings.ngrok_url.replace("https://", "wss://").replace("http://", "ws://")
+        if not ws_url.endswith("/ws"):
+            ws_url = f"{ws_url}/ws"
+    else:
+        # Local mode - use configured host and port
+        ws_url = f"ws://{settings.ws_host}:{settings.ws_port}/ws"
+    
+    return {
+        "ws_url": ws_url,
+        "version": "0.3.0",
+        "ngrok_mode": bool(settings.ngrok_url),
     }
 
 
@@ -348,12 +392,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             # Message loop
             while True:
                 # 🔍 TRACE: Log before receive
-                logger.info(f"[TRACE] 📥 Waiting for message on session {session_id} ({connection_type})")
+                logger.info(f"[TRACE] Waiting for message on session {session_id} ({connection_type})")
                 
                 data = await websocket.receive_json()
                 
                 # 🔍 TRACE: Log what we received
-                logger.info(f"[TRACE] 📦 Received message on session {session_id} ({connection_type}): type={data.get('type')}")
+                logger.info(f"[TRACE] Received message on session {session_id} ({connection_type}): type={data.get('type')}")
                 
                 # Get message type and session_id for logging
                 msg_type = data.get("type")
@@ -400,11 +444,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     await handle_tool_result(session_id, data)
                 
                 elif msg_type == "tool_request":
-                    # Tool request from MCP subprocess - route to frontend
+                    # Tool request from MCP subprocess - route to display clients
                     await route_tool_request_to_frontend(session_id, data)
                                 
                 elif msg_type == "tool_report":
-                    # Tool activity report from MCP subprocess - route to frontend
+                    # Tool activity report from MCP subprocess - route to display clients
                     await route_tool_report_to_frontend(session_id, data)
                 
                 elif msg_type == "screenshot":
@@ -946,7 +990,10 @@ async def handle_screenshot(session_id: str, data: dict) -> None:
 
 
 async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
-    """Route tool request from MCP subprocess to frontend.
+    """Route tool request from MCP subprocess to all display clients.
+    
+    Broadcasts to both frontend (which can execute) and PWA (which displays only).
+    Only frontend is expected to send back tool_result.
     
     Args:
         session_id: Session ID
@@ -954,13 +1001,16 @@ async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
     """
     try:
         logger.info(
-            f"Routing tool request to frontend: session={session_id}, "
+            f"Routing tool request to display clients: session={session_id}, "
             f"tool={data.get('tool_name')}, request_id={data.get('request_id')}"
         )
         
-        # Check if frontend is connected
-        if not manager.has_connection(session_id, 'frontend'):
-            error_msg = f"No frontend connection for session {session_id}"
+        # Check if ANY display client is connected
+        has_frontend = manager.has_connection(session_id, 'frontend')
+        has_pwa = manager.has_connection(session_id, 'pwa')
+        
+        if not has_frontend and not has_pwa:
+            error_msg = f"No display clients connected for session {session_id}.\n\n**What to do**\n- Ask the user to make sure they have ComfyUI open in their browser\n- If they do not see your reply in the ComfyUI Ren side drawer it means they are connected to the wrong session.\n- Tell them if they are on the Ren Go app they can refresh the page to choose a session"
             logger.error(error_msg)
             
             # Send error back to MCP subprocess
@@ -974,13 +1024,20 @@ async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
             }, target='mcp')
             return
         
-        # Forward the message to frontend and check result
-        result = await manager.send_message(session_id, data, target='frontend')
+        # Broadcast to all connected display clients
+        if has_frontend:
+            result = await manager.send_message(session_id, data, target='frontend')
+            if result:
+                logger.info(f"Tool request forwarded to frontend for session {session_id}")
+            else:
+                logger.error(f"Failed to forward tool request to frontend for session {session_id}")
         
-        if result:
-            logger.info(f"✅ Tool request successfully forwarded to frontend for session {session_id}")
-        else:
-            logger.error(f"❌ Failed to forward tool request to frontend for session {session_id}")
+        if has_pwa:
+            result = await manager.send_message(session_id, data, target='pwa')
+            if result:
+                logger.info(f"Tool request forwarded to PWA for session {session_id}")
+            else:
+                logger.error(f"Failed to forward tool request to PWA for session {session_id}")
         
     except Exception as e:
         logger.error(f"Error routing tool request: {e}", exc_info=True)
@@ -998,11 +1055,12 @@ async def route_tool_request_to_frontend(session_id: str, data: dict) -> None:
         except Exception as send_error:
             logger.error(f"Failed to send error response: {send_error}")
 
+
 async def route_tool_report_to_frontend(session_id: str, data: dict) -> None:
-    """Route tool activity report from MCP subprocess to frontend.
+    """Route tool activity report from MCP subprocess to all display clients.
     
     Tool reports are lightweight notifications that a Python-executed tool
-    is running. They don't require a response like tool_request does.
+    is running. They are broadcast to all display clients for visual feedback.
     
     Args:
         session_id: Session ID
@@ -1010,22 +1068,32 @@ async def route_tool_report_to_frontend(session_id: str, data: dict) -> None:
     """
     try:
         logger.debug(
-            f"Routing tool report to frontend: session={session_id}, "
+            f"Routing tool report to display clients: session={session_id}, "
             f"tool={data.get('tool_name')}"
         )
         
-        # Check if frontend is connected
-        if not manager.has_connection(session_id, 'frontend'):
-            logger.debug(f"No frontend connection for session {session_id}, skipping tool report")
+        # Check if ANY display client is connected
+        has_frontend = manager.has_connection(session_id, 'frontend')
+        has_pwa = manager.has_connection(session_id, 'pwa')
+        
+        if not has_frontend and not has_pwa:
+            logger.debug(f"No display clients for session {session_id}, skipping tool report")
             return
         
-        # Forward the message to frontend
-        result = await manager.send_message(session_id, data, target='frontend')
+        # Broadcast to all connected display clients
+        if has_frontend:
+            result = await manager.send_message(session_id, data, target='frontend')
+            if result:
+                logger.debug(f"Tool report forwarded to frontend for session {session_id}")
+            else:
+                logger.warning(f"Failed to forward tool report to frontend for session {session_id}")
         
-        if result:
-            logger.debug(f"✅ Tool report successfully forwarded to frontend for session {session_id}")
-        else:
-            logger.warning(f"❌ Failed to forward tool report to frontend for session {session_id}")
+        if has_pwa:
+            result = await manager.send_message(session_id, data, target='pwa')
+            if result:
+                logger.debug(f"Tool report forwarded to PWA for session {session_id}")
+            else:
+                logger.warning(f"Failed to forward tool report to PWA for session {session_id}")
         
     except Exception as e:
         logger.error(f"Error routing tool report: {e}", exc_info=True)
@@ -1037,6 +1105,6 @@ if __name__ == "__main__":
         "backend.server:app",
         host=settings.ws_host,
         port=settings.ws_port,
-        reload=True,
+        reload=False,
         log_level=settings.log_level.lower(),
     )

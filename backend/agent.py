@@ -6,6 +6,7 @@ for the FL_JS agentic system.
 
 import logging
 import os
+import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from contextvars import ContextVar
@@ -140,6 +141,16 @@ def get_llm_model():
             )
         )
     
+    elif settings.llm_provider == "local":
+        # OpenRouter uses OpenAI-compatible API
+        return OpenAIModel(
+            model_name,
+            provider=OpenAIProvider(
+                base_url=settings.local_llm_url,
+                api_key=settings.local_api_key
+            )
+        )
+
     elif settings.llm_provider == "anthropic":
         from pydantic_ai.models.anthropic import AnthropicModel
         return AnthropicModel(model_name)
@@ -271,9 +282,10 @@ def create_agent(session_id: str) -> Agent:
     mcp_server_path = str(Path(__file__).parent / 'mcp_server.py')
 
     # Launch MCP server with environment
+    # Use sys.executable to ensure subprocess uses same Python as current process
     mcp_servers = [
         MCPServerStdio(
-            'python',
+            sys.executable,  # Use current Python interpreter (respects venv)
             [mcp_server_path],
             env=mcp_env  # Pass environment to subprocess
         )

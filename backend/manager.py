@@ -320,12 +320,12 @@ class ConnectionManager:
             if websocket:
                 try:
                     await websocket.send_json(message)
-                    logger.debug(f"[SEND] ✅ Sent {message.get('type', 'unknown')} to {target}")
+                    logger.debug(f"[SEND] Sent {message.get('type', 'unknown')} to {target}")
                     sent = True
                 except Exception as e:
-                    logger.error(f"[SEND] ❌ Error sending to {target}: {e}")
+                    logger.error(f"[SEND] Error sending to {target}: {e}")
             else:
-                logger.warning(f"[SEND] ⚠️  WebSocket is None for {target} in session {session_id[:8]}...")
+                logger.warning(f"[SEND]   WebSocket is None for {target} in session {session_id[:8]}...")
         
         # Update last activity if any message was sent
         if sent and session_id in self.session_contexts:

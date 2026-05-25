@@ -18,6 +18,7 @@ export class FL_API {
     constructor() {
         console.log("[FL_API] Initialized");
         this.sessionId = null;  // Will be set by extension
+        this.layoutEngine = null;  // Lazy loaded when auto-layout is used
     }
 
     /**
@@ -314,15 +315,16 @@ export class FL_API {
      */
     fitView(nodeIds = null) {
         try {
+            const canvas = app.canvas;
             let nodes;
             
             if (nodeIds === null) {
                 // Use currently selected nodes
-                nodes = Object.values(app.canvas.selected_nodes || {});
+                nodes = Object.values(canvas.selected_nodes || {});
                 
                 if (nodes.length === 0) {
                     console.warn("[FL_API] No nodes selected, fitting all nodes");
-                    nodes = undefined;  // undefined = fit all
+                    nodes = app.graph._nodes;  // Use all nodes
                 }
             } else if (Array.isArray(nodeIds) && nodeIds.length > 0) {
                 // Find specified nodes
@@ -334,19 +336,52 @@ export class FL_API {
                     throw new Error(`None of the specified node IDs found: ${nodeIds}`);
                 }
             } else {
-                // Empty array or undefined = fit all nodes
-                nodes = undefined;
+                // Empty array = fit all nodes
+                nodes = app.graph._nodes;
             }
             
-            // Call LiteGraph fitNodes
-            app.canvas.fitNodes(nodes);
+            // FIT NODES
+            if (nodes.length > 0){
+                if (nodes.length === 1) // Single node: just center on it
+                    canvas.centerOnNode(nodes[0]);
             
-            const count = nodes ? nodes.length : app.graph._nodes.length;
+                // Multiple nodes: calculate bounding box and fit to view
+                let minX = Infinity, minY = Infinity;
+                let maxX = -Infinity, maxY = -Infinity;
+                
+                for (const node of nodes) {
+                    minX = Math.min(minX, node.pos[0]);
+                    minY = Math.min(minY, node.pos[1]);
+                    maxX = Math.max(maxX, node.pos[0] + node.size[0]);
+                    maxY = Math.max(maxY, node.pos[1] + node.size[1]);
+                }
+                
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const width = maxX - minX;
+                const height = maxY - minY;
+                
+                // Calculate zoom to fit with 10% padding
+                const zoomX = canvas.canvas.width / width - 0.1;
+                const zoomY = canvas.canvas.height / height - 0.1;
+                const targetZoom = Math.min(zoomX, zoomY, 1.0);  // Don't zoom in past 100%
+                
+                // Apply viewport transform
+                // canvas.ds.offset[0] = -centerX + canvas.canvas.width / 2 / targetZoom;
+                // canvas.ds.offset[1] = -centerY + canvas.canvas.height / 2 / targetZoom;
+                // canvas.ds.scale = targetZoom;
+                canvas.setZoom(targetZoom, [canvas.canvas.width / 2, canvas.canvas.height / 2]);
+            }
+            
+            // Mark canvas for redraw
+            canvas.setDirty(true, true);
+            
+            const count = nodes.length;
             console.log(`[FL_API] Fit view to ${count} node(s)`);
             
             return { 
                 fitted_count: count,
-                node_ids: nodes ? nodes.map(n => n.id) : app.graph._nodes.map(n => n.id)
+                node_ids: nodes.map(n => n.id)
             };
         } catch (error) {
             console.error("[FL_API] fitView error:", error);
@@ -978,13 +1013,69 @@ export class FL_API {
     }
 
     /**
-     * Modify layout for multiple nodes by setting their rectangles
+     * Modify layout for multiple nodes by setting their rectangles or using auto-layout
      * @param {object} nodeRects - rect objects mapped by nodeId {nodeId: {x, y, width, height}}
+     * @param {object} options - Optional auto-layout parameters {auto_layout, node_ids, strategy, spacing_multiplier}
      * @returns {Array<object>} Array of results with updated rectangles or errors
      */
-    modifyLayout(nodeRects = null) {
+    async modifyLayout(nodeRects = null, options = {}) {
         try {
-            // Input validation
+            // MODE 1: Auto-layout
+            if (options.auto_layout === true) {
+                console.log(`[FL_API] Auto-layout requested with strategy: ${options.strategy || 'flow_horizontal'}`);
+                
+                // Lazy load LayoutEngine
+                if (!this.layoutEngine) {
+                    const { LayoutEngine } = await import('./layout_engine.js');
+                    this.layoutEngine = new LayoutEngine();
+                    console.log("[FL_API] LayoutEngine loaded");
+                }
+
+                // Configure spacing
+                if (options.spacing_multiplier !== undefined && options.spacing_multiplier !== null) {
+                    this.layoutEngine.setSpacingMultiplier(options.spacing_multiplier);
+                } else {
+                    // Reset to default if not specified
+                    this.layoutEngine.setSpacingMultiplier(1.0);
+                }
+
+                // Run layout engine
+                const layout = this.layoutEngine.arrangeNodes(
+                    options.node_ids || null,
+                    options.strategy || "flow_horizontal",
+                    {}
+                );
+
+                // Apply calculated positions using setRect
+                const results = [];
+                for (const item of layout) {
+                    try {
+                        const updatedRect = this.setRect(item.node_id, {
+                            x: item.x,
+                            y: item.y,
+                            width: item.width,
+                            height: item.height
+                        });
+                        results.push({
+                            node_id: item.node_id,
+                            rect: updatedRect,
+                            success: true
+                        });
+                    } catch (error) {
+                        console.error(`[FL_API] Auto-layout: Error setting rect for node ${item.node_id}:`, error);
+                        results.push({
+                            node_id: item.node_id,
+                            success: false,
+                            error: error.message
+                        });
+                    }
+                }
+
+                console.log(`[FL_API] Auto-layout complete: ${results.length} nodes arranged`);
+                return results;
+            }
+
+            // MODE 2: Manual layout (existing behavior)
             if (!nodeRects || typeof nodeRects !== 'object') {
                 console.log('[FL_API] modifyLayout: No node rects provided');
                 return [];
@@ -1155,7 +1246,6 @@ export class FL_API {
      * @param {number|string|object} targetNodeId - Node to position
      * @param {number|string|object} anchorNodeId - Reference node
      * @param {number} margin - Margin between nodes
-     * @returns {object} Updated position
      */
     positionBottom(targetNodeId, anchorNodeId, margin = 64) {
         try {
@@ -1272,22 +1362,33 @@ export class FL_API {
     /**
      * Queue workflow for execution
      * @param {number|null} batchCount - Batch count (null for current)
-     * @returns {object} Queue result
+     * @returns {object} Queue result with prompt_id, queue_number, and node_errors
      */
     queueWorkflow(batchCount = null) {
         try {
             if (batchCount !== null) {
                 app.ui.batchCount.value = batchCount;
             }
-            app.queuePrompt();
+            
+            // Call ComfyUI's queuePrompt and capture the result
+            const queueResult = app.queuePrompt();
+            
             console.log(`[FL_API] Queued workflow (batch: ${app.ui.batchCount.value})`);
-            return { queued: true, batch_count: parseInt(app.ui.batchCount.value) };
+            console.log(`[FL_API] Queue result:`, queueResult);
+            
+            // Return comprehensive queue information
+            return { 
+                queued: true, 
+                batch_count: parseInt(app.ui.batchCount.value),
+                prompt_id: queueResult.prompt_id,
+                queue_number: queueResult.number,
+                node_errors: queueResult.node_errors || {}
+            };
         } catch (error) {
             console.error("[FL_API] queueWorkflow error:", error);
             throw error;
         }
     }
-
     /**
      * Cancel workflow execution
      * @returns {object} Cancel result

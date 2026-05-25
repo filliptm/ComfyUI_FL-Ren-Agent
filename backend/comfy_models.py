@@ -1,6 +1,6 @@
 """Pydantic models for ComfyUI extended tools."""
 
-from typing import List, Dict, Optional, Any, Union
+from typing import List, Dict, Literal, Optional, Any, Union
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -15,9 +15,17 @@ class ComfyFolderType(str, Enum):
     CONTROLNET = "controlnet"
     UPSCALE_MODELS = "upscale_models"
     EMBEDDINGS = "embeddings"
+    CLIP = "clip"
+    CLIP_VISION = "clip_vision"
+    CONFIGS = "configs"
+    DIFFUSION_MODELS = "diffusion_models"
+    HYPERNETWORKS = "hypernetworks"
+    GLIGEN = "gligen"
+    UNET = "unet"
     OUTPUT = "output"
     INPUT = "input"
     TEMP = "temp"
+    WORKFLOWS = "workflows"
 
 
 class ComfyFileInfo(BaseModel):
@@ -41,10 +49,31 @@ class ComfySearchResult(BaseModel):
 
 # REQUEST MODELS
 class ComfyListFoldersRequest(BaseModel):
-    """Request to list ComfyUI directory contents."""
+    """Request to list ComfyUI directory contents with filtering and sorting."""
     folder_type: ComfyFolderType = Field(
         ..., 
         description="Type of ComfyUI directory to list"
+    )
+    pattern: Optional[str] = Field(
+        None,
+        description="Regex pattern to filter by full relative path (case-insensitive). "
+                    "Examples: '.*\\.safetensors$' for safetensors files, 'sdxl' for SDXL models"
+    )
+    sort_by: Optional[Literal["name", "size", "modified_time", "type"]] = Field(
+        None,
+        description="Field to sort by: 'name' (filename), 'size' (file size), "
+                    "'modified_time' (last modified), 'type' (extension/directory). "
+                    "If None, sorts directories first then alphabetically by name."
+    )
+    order: Literal["asc", "desc"] = Field(
+        "asc",
+        description="Sort order: 'asc' (ascending) or 'desc' (descending)"
+    )
+    limit: int = Field(
+        50,
+        ge=1,
+        le=1000,
+        description="Maximum number of items to return (default: 50, max: 1000)"
     )
 
 

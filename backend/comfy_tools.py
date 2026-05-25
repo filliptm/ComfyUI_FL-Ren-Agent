@@ -7,48 +7,17 @@ for agent-based analysis and discovery.
 import os
 import re
 import logging
+import httpx
 from pathlib import Path
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any, Iterator
 from dataclasses import dataclass
 from enum import Enum
 
+from comfy_models import ComfyFolderType, ComfyFileInfo, ComfySearchResult
+from extra_model_paths_loader import ExtraModelPathsLoader
+from path_resolver import PathResolver
+
 logger = logging.getLogger(__name__)
-
-
-class ComfyFolderType(str, Enum):
-    """Supported ComfyUI folder types."""
-    CUSTOM_NODES = "custom_nodes"
-    MODELS = "models"
-    CHECKPOINTS = "checkpoints"
-    LORAS = "loras"
-    VAE = "vae"
-    CONTROLNET = "controlnet"
-    UPSCALE_MODELS = "upscale_models"
-    EMBEDDINGS = "embeddings"
-    OUTPUT = "output"
-    INPUT = "input"
-    TEMP = "temp"
-
-
-@dataclass
-class ComfyFileInfo:
-    """Information about a ComfyUI file or directory."""
-    name: str
-    path: str
-    is_directory: bool
-    size: Optional[int] = None
-    modified_time: Optional[float] = None
-    extension: Optional[str] = None
-
-
-@dataclass
-class ComfySearchResult:
-    """Result from ComfyUI file pattern search."""
-    file_path: str
-    line_number: int
-    line_content: str
-    context_before: List[str]
-    context_after: List[str]
 
 
 class ComfyUIError(Exception):
@@ -69,25 +38,30 @@ class ComfyUISecurityError(ComfyUIError):
 class ComfyUITools:
     """Core ComfyUI filesystem utilities."""
     
-    def __init__(self, comfyui_root: Optional[str] = None):
-        """Initialize ComfyUI tools with auto-detection."""
+    def __init__(self, comfyui_root: Optional[str] = None, comfy_url: str = "http://127.0.0.1:8188"):
+        """Initialize ComfyUI tools with auto-detection.
+        
+        Args:
+            comfyui_root: Path to ComfyUI installation (auto-detected if None)
+            comfy_url: URL of ComfyUI server (default: http://127.0.0.1:8188)
+        """
         self.comfyui_root = Path(comfyui_root) if comfyui_root else self._find_comfyui_root()
+        self.comfy_url = comfy_url
         self._validate_comfyui_installation()
         
-        # Define folder mappings
-        self.folder_mappings = {
-            ComfyFolderType.CUSTOM_NODES: "custom_nodes",
-            ComfyFolderType.MODELS: "models",
-            ComfyFolderType.CHECKPOINTS: "models/checkpoints",
-            ComfyFolderType.LORAS: "models/loras",
-            ComfyFolderType.VAE: "models/vae",
-            ComfyFolderType.CONTROLNET: "models/controlnet",
-            ComfyFolderType.UPSCALE_MODELS: "models/upscale_models",
-            ComfyFolderType.EMBEDDINGS: "models/embeddings",
-            ComfyFolderType.OUTPUT: "output",
-            ComfyFolderType.INPUT: "input",
-            ComfyFolderType.TEMP: "temp",
-        }
+        # Load extra model paths and merge with defaults
+        loader = ExtraModelPathsLoader(self.comfyui_root)
+        extra_configs = loader.load()
+        
+        resolver = PathResolver(self.comfyui_root)
+        default_mappings = resolver.get_default_mappings()
+        self.folder_mappings = resolver.merge_with_extra_paths(default_mappings, extra_configs)
+        
+        # Log summary
+        logger.info(f"ComfyUI tools initialized for: {self.comfyui_root}")
+        logger.info(f"Loaded folder mappings for {len(self.folder_mappings)} folder types")
+        for folder_type, paths in self.folder_mappings.items():
+            logger.debug(f"  {folder_type.value}: {len(paths)} path(s)")
         
         # Safe file extensions for reading
         self.safe_read_extensions = {
@@ -95,8 +69,6 @@ class ComfyUITools:
             '.cfg', '.ini', '.conf', '.log', '.csv', '.xml', '.html', '.js', 
             '.css', '.sh', '.bat'
         }
-        
-        logger.info(f"ComfyUI tools initialized for: {self.comfyui_root}")
     
     def _find_comfyui_root(self) -> Path:
         """Auto-detect ComfyUI installation directory."""
@@ -172,55 +144,322 @@ class ComfyUITools:
         except Exception as e:
             raise ComfyUISecurityError(f"Invalid path: {path} - {e}")
     
-    def list_folders(self, folder_type: Union[str, ComfyFolderType]) -> List[ComfyFileInfo]:
-        """List contents of a ComfyUI directory by type."""
+    def _iter_all_paths(self, folder_type: ComfyFolderType) -> Iterator[Path]:
+        """Iterate all configured paths for a folder type.
+        
+        This is an internal helper to avoid code duplication between
+        list_folders and search_files.
+        
+        Args:
+            folder_type: Type of folder to iterate
+            
+        Yields:
+            Path objects for each configured path that exists
+        """
+        folder_paths = self.folder_mappings.get(folder_type, [])
+        for folder_path in folder_paths:
+            if folder_path.exists():
+                yield folder_path
+            else:
+                logger.debug(f"Skipping non-existent path: {folder_path}")
+    
+    async def fetch_history(self, prompt_id: Optional[str] = None, max_items: int = 10) -> Dict[str, Any]:
+        """Fetch execution history from ComfyUI.
+        
+        Args:
+            prompt_id: Optional specific prompt ID to fetch. If None, fetches recent history.
+            max_items: Maximum number of history items to fetch (default: 10)
+            
+        Returns:
+            If prompt_id is provided: Single history entry dict or None if not found
+            If prompt_id is None: Dict mapping prompt_id -> history entry
+            
+        Raises:
+            ComfyUIError: If history fetch fails
+        """
         try:
-            # Convert string to enum if needed
-            if isinstance(folder_type, str):
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.comfy_url}/history",
+                    params={"max_items": max_items},
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                
+                history = response.json()
+                
+                # Strip out "prompt" key to reduce token usage
+                # We only care about status, outputs, and errors
+                for prompt_id_key, entry in history.items():
+                    if "prompt" in entry:
+                        del entry["prompt"]
+                
+                if prompt_id:
+                    return history.get(prompt_id)
+                else:
+                    return history
+                    
+        except httpx.TimeoutException:
+            raise ComfyUIError(
+                f"ComfyUI server timeout. Is ComfyUI running at {self.comfy_url}?"
+            )
+        except httpx.RequestError as e:
+            raise ComfyUIError(
+                f"Failed to connect to ComfyUI at {self.comfy_url}: {e}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch history: {e}")
+            raise ComfyUIError(f"Failed to fetch history: {e}")    
+
+    async def delete_queue_items(
+        self,
+        clear_all: bool = False,
+        prompt_ids: Optional[List[str]] = None,
+        interrupt_running: bool = False
+    ) -> Dict[str, Any]:
+        """Delete items from the ComfyUI queue.
+        
+        Args:
+            clear_all: If True, clear all pending items from queue
+            prompt_ids: List of specific prompt IDs to delete
+            interrupt_running: If True, also interrupt currently running workflow
+            
+        Returns:
+            Dict with operation results:
+            {
+                "success": bool,
+                "cleared_all": bool,
+                "deleted_ids": List[str],
+                "interrupted": bool,
+                "message": str
+            }
+            
+        Raises:
+            ComfyUIError: If operation fails or parameters are invalid
+        """
+        # Validation: must provide at least one operation
+        if not clear_all and not prompt_ids and not interrupt_running:
+            raise ComfyUIError(
+                "Must specify at least one operation: clear_all, prompt_ids, or interrupt_running"
+            )
+        
+        # Validation: cannot specify both clear_all and prompt_ids
+        if clear_all and prompt_ids:
+            raise ComfyUIError(
+                "Cannot specify both clear_all=True and prompt_ids. Choose one."
+            )
+        
+        results = {
+            "success": True,
+            "cleared_all": False,
+            "deleted_ids": [],
+            "interrupted": False,
+            "message": ""
+        }
+        
+        messages = []
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                # Operation 1: Clear all pending items
+                if clear_all:
+                    try:
+                        response = await client.post(
+                            f"{self.comfy_url}/queue",
+                            json={"clear": True},
+                            timeout=10.0
+                        )
+                        response.raise_for_status()
+                        results["cleared_all"] = True
+                        messages.append("Cleared all pending queue items")
+                        logger.info("Queue cleared successfully")
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"Failed to clear queue: {e}")
+                        results["success"] = False
+                        messages.append(f"Failed to clear queue: {e.response.status_code}")
+                
+                # Operation 2: Delete specific prompt IDs
+                if prompt_ids:
+                    try:
+                        response = await client.post(
+                            f"{self.comfy_url}/queue",
+                            json={"delete": prompt_ids},
+                            timeout=10.0
+                        )
+                        response.raise_for_status()
+                        results["deleted_ids"] = prompt_ids
+                        messages.append(f"Deleted {len(prompt_ids)} queue item(s): {', '.join(prompt_ids)}")
+                        logger.info(f"Deleted queue items: {prompt_ids}")
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"Failed to delete queue items: {e}")
+                        results["success"] = False
+                        messages.append(f"Failed to delete items: {e.response.status_code}")
+                
+                # Operation 3: Interrupt running workflow
+                if interrupt_running:
+                    try:
+                        response = await client.post(
+                            f"{self.comfy_url}/interrupt",
+                            json={},
+                            timeout=10.0
+                        )
+                        response.raise_for_status()
+                        results["interrupted"] = True
+                        messages.append("Interrupted currently running workflow")
+                        logger.info("Workflow interrupted successfully")
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"Failed to interrupt workflow: {e}")
+                        # Don't fail the entire operation if interrupt fails
+                        # (might not have anything running)
+                        messages.append(f"Interrupt failed (nothing running?): {e.response.status_code}")
+                
+                results["message"] = "; ".join(messages)
+                return results
+                
+        except httpx.TimeoutException:
+            raise ComfyUIError(
+                f"ComfyUI server timeout. Is ComfyUI running at {self.comfy_url}?"
+            )
+        except httpx.RequestError as e:
+            raise ComfyUIError(
+                f"Failed to connect to ComfyUI at {self.comfy_url}: {e}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to delete queue items: {e}")
+            raise ComfyUIError(f"Failed to delete queue items: {e}")
+
+
+    def list_folders(
+        self,
+        folder_type: Union[str, ComfyFolderType],
+        pattern: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        order: str = "asc",
+        limit: int = 50
+    ) -> List[ComfyFileInfo]:
+        """List contents of a ComfyUI directory by type with filtering and sorting.
+        
+        Searches all configured paths for the folder type, including paths from
+        extra_model_paths.yaml if present. Deduplicates files with the same name
+        found in multiple paths.
+        
+        Args:
+            folder_type: Type of folder to list (e.g., 'checkpoints', 'loras')
+            pattern: Optional regex pattern to filter paths (case-insensitive)
+            sort_by: Optional sort field ('name', 'size', 'modified_time', 'type')
+            order: Sort order ('asc' or 'desc')
+            limit: Maximum number of items to return
+        
+        Returns:
+            List of ComfyFileInfo objects, filtered, sorted, and limited
+        
+        Raises:
+            ComfyUINotFoundError: If ComfyUI installation not found
+            ComfyUISecurityError: If path traversal detected
+        """
+        # Convert string to enum if needed
+        if isinstance(folder_type, str):
+            try:
                 folder_type = ComfyFolderType(folder_type)
+            except ValueError:
+                raise ComfyUIError(f"Invalid folder type: {folder_type}")
+        
+        # Get all paths for this folder type
+        folder_paths = self.folder_mappings.get(folder_type, [])
+        
+        if not folder_paths:
+            raise ComfyUIError(f"Unknown folder type: {folder_type}")
+        
+        # Collect items from all paths with deduplication
+        items = []
+        seen_names = set()  # Deduplicate by name (first occurrence wins)
+        
+        for folder_path in self._iter_all_paths(folder_type):
+            # Security check
+            try:
+                folder_path_resolved = folder_path.resolve()
+                # Note: folder_path might be outside comfyui_root if from extra_model_paths.yaml
+                # This is intentional - we trust the YAML config
+            except (OSError, RuntimeError) as e:
+                logger.warning(f"Cannot resolve path {folder_path}: {e}")
+                continue
             
-            # Get folder path
-            folder_path = self.folder_mappings.get(folder_type)
-            if not folder_path:
-                raise ComfyUIError(f"Unknown folder type: {folder_type}")
-            
-            # Validate and resolve path
-            full_path = self._validate_path(folder_path)
-            
-            if not full_path.exists():
-                logger.warning(f"Directory does not exist: {full_path}")
-                return []
-            
-            if not full_path.is_dir():
-                raise ComfyUIError(f"Path is not a directory: {folder_path}")
-            
-            # List directory contents
-            items = []
-            for item in full_path.iterdir():
+            for entry in folder_path.iterdir():
+                # Skip duplicates (same filename in multiple paths)
+                if entry.name in seen_names:
+                    logger.debug(f"Skipping duplicate: {entry.name}")
+                    continue
+                
+                seen_names.add(entry.name)
+                
                 try:
-                    stat = item.stat()
+                    stat = entry.stat()
+                    
+                    # Calculate relative path
+                    # Try relative to comfyui_root first, fallback to absolute
+                    try:
+                        relative_path = str(entry.relative_to(self.comfyui_root))
+                    except ValueError:
+                        # Path is outside comfyui_root (from extra_model_paths.yaml)
+                        relative_path = str(entry)
+                    
                     items.append(ComfyFileInfo(
-                        name=item.name,
-                        path=str(item.relative_to(self.comfyui_root)),
-                        is_directory=item.is_dir(),
-                        size=stat.st_size if item.is_file() else None,
+                        name=entry.name,
+                        path=relative_path,
+                        is_directory=entry.is_dir(),
+                        size=stat.st_size if entry.is_file() else None,
                         modified_time=stat.st_mtime,
-                        extension=item.suffix.lower() if item.is_file() else None
+                        extension=entry.suffix[1:] if entry.suffix else None
                     ))
                 except (OSError, PermissionError) as e:
-                    logger.warning(f"Cannot access {item}: {e}")
+                    logger.warning(f"Cannot access {entry}: {e}")
                     continue
-            
-            # Sort: directories first, then by name
+        
+        # Apply regex filter if pattern provided
+        if pattern:
+            try:
+                regex = re.compile(pattern, re.IGNORECASE)
+                original_count = len(items)
+                items = [item for item in items if regex.search(item.path)]
+                logger.debug(
+                    f"Filtered from {original_count} to {len(items)} items "
+                    f"matching pattern: {pattern}"
+                )
+            except re.error as e:
+                logger.warning(f"Invalid regex pattern '{pattern}': {e}")
+                # Continue without filtering on invalid pattern
+        
+        # Apply sorting
+        if sort_by is None:
+            # Default: directories first, then alphabetical by name
             items.sort(key=lambda x: (not x.is_directory, x.name.lower()))
+            logger.debug("Applied default sort: directories first, then by name")
+        else:
+            # Sort by specified field
+            reverse = (order == "desc")
             
-            logger.info(f"Listed {len(items)} items in {folder_path}")
-            return items
+            if sort_by == "name":
+                items.sort(key=lambda x: x.name.lower(), reverse=reverse)
+            elif sort_by == "size":
+                items.sort(key=lambda x: x.size or 0, reverse=reverse)
+            elif sort_by == "modified_time":
+                items.sort(key=lambda x: x.modified_time or 0, reverse=reverse)
+            elif sort_by == "type":
+                # Sort by: directories vs files, then by extension
+                if order == "asc":
+                    items.sort(key=lambda x: (not x.is_directory, x.extension or ""))
+                else:
+                    items.sort(key=lambda x: (x.is_directory, x.extension or ""), reverse=True)
             
-        except ComfyUIError:
-            raise
-        except Exception as e:
-            raise ComfyUIError(f"Error listing folder {folder_type}: {e}")
+            logger.debug(f"Sorted by {sort_by} ({order})")
+        
+        # Apply limit
+        original_count = len(items)
+        if limit and len(items) > limit:
+            items = items[:limit]
+            logger.debug(f"Limited results from {original_count} to {limit} items")
+        
+        return items
     
     def read_file(self, path: str, max_size: int = 1024 * 1024) -> str:
         """Read a text file within the ComfyUI directory."""
@@ -271,23 +510,21 @@ class ComfyUITools:
         max_results: int = 20,
         context_lines: int = 2
     ) -> List[ComfySearchResult]:
-        """Search for pattern in files within a ComfyUI directory."""
+        """Search for pattern in files within a ComfyUI directory.
+        
+        Searches all configured paths for the folder type, including paths from
+        extra_model_paths.yaml if present.
+        """
         try:
             # Convert string to enum if needed
             if isinstance(folder_type, str):
                 folder_type = ComfyFolderType(folder_type)
             
-            # Get folder path
-            folder_path = self.folder_mappings.get(folder_type)
-            if not folder_path:
+            # Get all paths for this folder type
+            folder_paths = self.folder_mappings.get(folder_type, [])
+            
+            if not folder_paths:
                 raise ComfyUIError(f"Unknown folder type: {folder_type}")
-            
-            # Validate path
-            full_path = self._validate_path(folder_path)
-            
-            if not full_path.exists():
-                logger.warning(f"Search directory does not exist: {full_path}")
-                return []
             
             # Compile regex pattern
             regex = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
@@ -295,50 +532,59 @@ class ComfyUITools:
             results = []
             files_searched = 0
             
-            # Search files recursively
-            for file_path in full_path.rglob(file_pattern or "*"):
-                if not file_path.is_file():
-                    continue
-                
-                # Skip binary files and very large files
-                if file_path.suffix.lower() not in self.safe_read_extensions:
-                    continue
-                
-                try:
-                    file_size = file_path.stat().st_size
-                    if file_size > 1024 * 1024:  # Skip files > 1MB
+            # Search in all configured paths
+            for folder_path in self._iter_all_paths(folder_type):
+                # Search files recursively
+                for file_path in folder_path.rglob(file_pattern or "*"):
+                    if not file_path.is_file():
                         continue
                     
-                    # Read and search file
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
-                    lines = content.split('\n')
+                    # Skip binary files and very large files
+                    if file_path.suffix.lower() not in self.safe_read_extensions:
+                        continue
                     
-                    for line_num, line in enumerate(lines, 1):
-                        if regex.search(line):
-                            # Extract context
-                            start_line = max(0, line_num - context_lines - 1)
-                            end_line = min(len(lines), line_num + context_lines)
-                            
-                            context_before = lines[start_line:line_num-1]
-                            context_after = lines[line_num:end_line]
-                            
-                            results.append(ComfySearchResult(
-                                file_path=str(file_path.relative_to(self.comfyui_root)),
-                                line_number=line_num,
-                                line_content=line.strip(),
-                                context_before=context_before,
-                                context_after=context_after
-                            ))
-                            
-                            if len(results) >= max_results:
-                                logger.info(f"Search truncated at {max_results} results")
-                                return results
-                    
-                    files_searched += 1
-                    
-                except (OSError, UnicodeDecodeError) as e:
-                    logger.debug(f"Skipped file {file_path}: {e}")
-                    continue
+                    try:
+                        file_size = file_path.stat().st_size
+                        if file_size > 1024 * 1024:  # Skip files > 1MB
+                            continue
+                        
+                        # Read and search file
+                        content = file_path.read_text(encoding='utf-8', errors='ignore')
+                        lines = content.split('\n')
+                        
+                        for line_num, line in enumerate(lines, 1):
+                            if regex.search(line):
+                                # Extract context
+                                start_line = max(0, line_num - context_lines - 1)
+                                end_line = min(len(lines), line_num + context_lines)
+                                
+                                context_before = lines[start_line:line_num-1]
+                                context_after = lines[line_num:end_line]
+                                
+                                # Calculate relative path
+                                try:
+                                    relative_path = str(file_path.relative_to(self.comfyui_root))
+                                except ValueError:
+                                    # Path is outside comfyui_root
+                                    relative_path = str(file_path)
+                                
+                                results.append(ComfySearchResult(
+                                    file_path=relative_path,
+                                    line_number=line_num,
+                                    line_content=line.strip(),
+                                    context_before=context_before,
+                                    context_after=context_after
+                                ))
+                                
+                                if len(results) >= max_results:
+                                    logger.info(f"Search truncated at {max_results} results")
+                                    return results
+                        
+                        files_searched += 1
+                        
+                    except (OSError, UnicodeDecodeError) as e:
+                        logger.debug(f"Skipped file {file_path}: {e}")
+                        continue
             
             logger.info(f"Search complete: {len(results)} matches in {files_searched} files")
             return results

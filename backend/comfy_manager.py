@@ -77,6 +77,18 @@ class NodeMapping:
     node_pack_name: str
 
 
+@dataclass
+class ModelInfo:
+    """Information about an installed model file."""
+    name: str                    # Filename without path
+    path: str                    # Relative path from ComfyUI root
+    folder_type: str             # checkpoints, loras, vae, etc.
+    size: int                    # File size in bytes
+    extension: str               # .safetensors, .ckpt, .pt, etc.
+    modified_time: float         # Unix timestamp
+    size_mb: float               # Formatted size in MB
+
+
 # ============================================================================
 # Cache
 # ============================================================================
@@ -127,6 +139,20 @@ class ManagerCache:
 # ============================================================================
 # Core Client
 # ============================================================================
+
+@dataclass
+class ExternalModelInfo:
+    """Information about an external (uninstalled) model."""
+    name: str
+    filename: str
+    type: str
+    base: str
+    description: str
+    reference: str
+    save_path: str
+    size: str
+    url: str
+    installed: bool  # Converted from string
 
 class ComfyManagerClient:
     """Client for ComfyUI Manager REST API."""
@@ -456,7 +482,124 @@ class ComfyManagerClient:
                 "updates_available": False,
                 "message": "No updates available"
             }
-
+    
+    async def search_external_models(
+        self,
+        query: Optional[str] = None,
+        base_filter: Optional[str] = None,
+        type_filter: Optional[str] = None,
+        name_filter: Optional[str] = None,
+        description_filter: Optional[str] = None,
+        reference_filter: Optional[str] = None,
+        uninstalled_only: bool = True,
+        installed_only: bool = False,
+        max_results: int = 10,
+        mode: Literal["cache", "remote"] = "cache"
+    ) -> List[ExternalModelInfo]:
+        """Search for external models in Manager registry.
+        
+        Args:
+            query: Regex search across name, description, filename
+            base_filter: Regex filter for base field
+            type_filter: Regex filter for type field  
+            name_filter: Regex filter for name field
+            description_filter: Regex filter for description
+            reference_filter: Regex filter for reference URL
+            uninstalled_only: Only show uninstalled (default: True)
+            installed_only: Only show installed (default: False)
+            max_results: Maximum results (default: 10)
+            mode: Data source (cache or remote)
+            
+        Returns:
+            List of ExternalModelInfo matching criteria
+        """
+        await self._ensure_installed()
+        
+        # Check cache
+        cache_key = f"external_models_{mode}"
+        cached = await self.cache.get(cache_key)
+        
+        if cached is None:
+            # Fetch from API
+            data = await self._get("/externalmodel/getlist", params={"mode": mode})
+            
+            # Parse models
+            all_models = []
+            raw_models = data.get("models", [])
+            
+            for model in raw_models:
+                all_models.append(ExternalModelInfo(
+                    name=model.get("name", ""),
+                    filename=model.get("filename", ""),
+                    type=model.get("type", ""),
+                    base=model.get("base", ""),
+                    description=model.get("description", ""),
+                    reference=model.get("reference", ""),
+                    save_path=model.get("save_path", ""),
+                    size=model.get("size", ""),
+                    url=model.get("url", ""),
+                    installed=model.get("installed", "False") == "True"
+                ))
+            
+            await self.cache.set(cache_key, all_models)
+            logger.info(f"[Manager] Fetched {len(all_models)} external models")
+        else:
+            all_models = cached
+        
+        # Apply filters
+        import re
+        results = []
+        
+        for model in all_models:
+            # Installation status filter
+            if uninstalled_only and model.installed:
+                continue
+            if installed_only and not model.installed:
+                continue
+            
+            # General query (across name, description, filename)
+            if query:
+                try:
+                    pattern = re.compile(query, re.IGNORECASE)
+                    if not (pattern.search(model.name) or 
+                            pattern.search(model.description) or 
+                            pattern.search(model.filename)):
+                        continue
+                except re.error:
+                    # Invalid regex, skip this filter
+                    pass
+            
+            # Field-specific filters
+            filter_map = {
+                'base_filter': model.base,
+                'type_filter': model.type,
+                'name_filter': model.name,
+                'description_filter': model.description,
+                'reference_filter': model.reference
+            }
+            
+            skip = False
+            for param_name, field_value in filter_map.items():
+                filter_value = locals().get(param_name)
+                if filter_value:
+                    try:
+                        if not re.search(filter_value, field_value, re.IGNORECASE):
+                            skip = True
+                            break
+                    except re.error:
+                        # Invalid regex, skip this filter
+                        pass
+            
+            if skip:
+                continue
+            
+            results.append(model)
+            
+            if len(results) >= max_results:
+                break
+        
+        logger.info(f"[Manager] External model search found {len(results)} models")
+        return results
 
 # ============================================================================
 # Global Instance

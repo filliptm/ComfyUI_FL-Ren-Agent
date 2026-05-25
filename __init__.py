@@ -7,13 +7,14 @@ The backend handles AI agent interactions and WebSocket communication.
 
 Configuration:
     Edit .env file to configure backend settings:
+    - BACKEND_LAUNCH_MODE: How to launch backend (auto/terminal/subprocess/manual)
     - AUTO_START_BACKEND: Enable/disable auto-start (default: true)
-    - AUTO_RESTART_BACKEND: Auto-restart on crash (default: true)
+    - AUTO_RESTART_BACKEND: Auto-restart on crash (default: true, subprocess only)
     - WS_PORT: Backend server port (default: 8000)
 
 Manual Backend Start:
     If you prefer to start the backend manually:
-    1. Set AUTO_START_BACKEND=false in .env
+    1. Set BACKEND_LAUNCH_MODE=manual in .env
     2. Run: cd backend && python server.py
 
 For more information, see README.md
@@ -36,18 +37,21 @@ try:
     AUTO_START = settings.auto_start_backend
     AUTO_RESTART = settings.auto_restart_backend
     LOG_TO_FILE = settings.log_backend_to_file
+    LAUNCH_MODE = settings.backend_launch_mode
     PORT = settings.ws_port
 except ImportError as e:
     print(f"[FL_JS] Warning: Could not load config ({e}), using defaults")
     AUTO_START = True
     AUTO_RESTART = True
     LOG_TO_FILE = True
+    LAUNCH_MODE = "auto"
     PORT = 8000
 except Exception as e:
     print(f"[FL_JS] Warning: Error loading config ({e}), using defaults")
     AUTO_START = True
     AUTO_RESTART = True
     LOG_TO_FILE = True
+    LAUNCH_MODE = "auto"
     PORT = 8000
 
 # Start backend server if enabled
@@ -62,6 +66,7 @@ if AUTO_START:
         server_runner = ServerRunner(
             backend_dir=str(BACKEND_DIR),
             port=PORT,
+            launch_mode=LAUNCH_MODE,
             auto_start=True,
             auto_restart=AUTO_RESTART,
             log_to_file=LOG_TO_FILE,

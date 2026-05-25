@@ -34,8 +34,8 @@ export class MessageBubble {
             // Handle api/ links - prepend the backend URL
             if (href.startsWith("api/")) {
                 // If on localhost, use the ws client's configured URL
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    // Extract protocol and host from ws client config (e.g., ws://localhost:8000/ws -> http://localhost:8000)
+                if (window.location.hostname === '127.0.0.1' || window.location.hostname === '127.0.0.1') {
+                    // Extract protocol and host from ws client config (e.g., ws://127.0.0.1:8000/ws -> http://127.0.0.1:8000)
                     if (window.wsClient && window.wsClient.config && window.wsClient.config.url) {
                         const wsUrl = window.wsClient.config.url;
                         const wsProtocol = wsUrl.startsWith('wss://') ? 'https://' : 'http://';

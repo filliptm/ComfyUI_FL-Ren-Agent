@@ -16,23 +16,23 @@
 - **Query your graph** - "Show me all nodes connected to the checkpoint loader"
 - **Visual feedback** - Get Mermaid diagrams of your workflow structure
 
-### 📱 Ren Go - Mobile PWA
+### 📱 Ren Go - Mobile App
 - **Mobile access** - Control ComfyUI from your phone
-- **Session picker** - Connect to any active ComfyUI session
+- **Session picker** - Connect to any active ComfyUI session **ONLY IF OPEN ON YOUR COMPUTER**
 - **Smart notifications** - Get notified when workflows complete or fail
 - **Ren links** - One-tap actions like "Show me the output"
-- **Offline support** - PWA works offline, reconnects automatically
+- **Offline support** - App works offline, reconnects automatically
 - **Multi-device** - Use desktop and mobile simultaneously
 
-📖 **[Complete PWA Setup Guide](web/pwa/README.md)**
+📖 **[Complete Ren Go Setup Guide](web/pwa/README.md)**
 
 ### 🛠️ Comprehensive Tool Suite (45+ Tools)
-- **Node Management** - Create, find, remove, bypass, pin, and select nodes
+- **Node Management** - Create, find, remove, bypass, pin, and select nodes **NO SAVE ACCESS**
 - **Node Manipulation** - Get/set parameters, connect nodes intelligently
 - **Layout Control** - Auto-arrange workflows, position nodes relative to each other
 - **Workflow Execution** - Queue, cancel, batch processing, monitor status
 - **Advanced Queries** - Filter nodes, traverse connections, aggregate data
-- **ComfyUI Filesystem** - Browse custom nodes, models, search files securely
+- **ComfyUI Filesystem** - Browse custom nodes, models, search files securely **NO WRITE ACCES**
 - **Node Pack Discovery** - Search and discover custom node packs via Manager
 - **System Information** - OS, Python, and environment detection for help
 - **Canvas Control** - Focus on nodes, take screenshots for visual debugging
@@ -153,8 +153,8 @@ Ren: [Checks system info]
 #### 1. Clone into ComfyUI custom_nodes directory
 ```bash
 cd /path/to/ComfyUI/custom_nodes
-git clone https://github.com/yourusername/fl_js.git FL_JS
-cd FL_JS
+git clone https://github.com/CLIP-py/ComfyUI-RenAgent.git
+cd ComfyUI-RenAgent
 ```
 
 > **Important:** The directory must be named `FL_JS` (or your preferred name) inside `custom_nodes/`
@@ -282,7 +282,7 @@ FL_JS uses **smart defaults** for each provider. You only need to set `LLM_PROVI
 | Provider | Default Model | API Key Required |
 |----------|---------------|------------------|
 | **OpenAI** | `gpt-4-turbo-preview` | `OPENAI_API_KEY` |
-| **Anthropic** | `claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
+| **Anthropic** | `claude-sonnet-4` | `ANTHROPIC_API_KEY` |
 | **Gemini** | `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
 | **OpenRouter** | `deepseek/deepseek-chat` | `OPENROUTER_API_KEY` |
 
@@ -353,11 +353,11 @@ These optimizations happen **automatically** - no configuration needed!
 graph TB
     subgraph "ComfyUI Browser"
         UI["🖥️ Chat Sidebar<br/>(extension.js)"]
-        FL["🔧 FL_JS Legacy<br/>(fl_js.js)"]
+        FL["🔧 Javascript FL API<br/>(fl_api.js)"]
     end
     
     subgraph "Mobile Device"
-        PWA["📱 Ren Go PWA<br/>(Mobile Interface)"]
+        PWA["📱 Ren Go App<br/>(Mobile Interface)"]
     end
     
     subgraph "Backend Server (Python)"
@@ -406,7 +406,7 @@ graph TB
 ## 📁 Project Structure
 
 ```
-FL_JS/
+ComfyUI-RenAgent/
 ├── __init__.py              # ComfyUI node registration + auto-start
 ├── .env.example             # Configuration template
 ├── requirements.txt         # Python dependencies
@@ -550,7 +550,7 @@ See `notes/implementation/02_query_dsl.md` for complete documentation.
 
 1. Ren decides to use a tool (e.g., "create_node")
 2. Backend sends tool request via WebSocket
-3. Frontend executes FL_JS function
+3. Frontend executes FL_API function
 4. Frontend returns result via WebSocket
 5. Backend provides result to Ren
 6. Ren continues with response
@@ -621,7 +621,7 @@ netstat -ano | findstr :8000  # Windows
 - `[WSClient] Max reconnection attempts reached` - Backend unreachable
 
 **Verify WebSocket URL:**
-- Default: `ws://localhost:8000/ws`
+- Default: `ws://127.0.0.1:8000/ws`
 - Check `web/js/extension.js` line 23
 
 ### Manual backend control
@@ -693,9 +693,32 @@ Contributions are welcome! Please:
 
 ---
 
-## 📝 License
+## 📜 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+Ren is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+### What does this mean?
+
+- ✅ **Free for personal use** - Use Ren however you want on your own computer
+- ✅ **Free for education** - Students and researchers can use freely
+- ✅ **Free for internal business use** - Companies can use internally
+- ✅ **Open source contributions welcome** - Fork, modify, and contribute back
+- ⚠️ **Network copyleft** - If you run Ren as a public service, you must open-source your modifications
+
+### Commercial Licensing
+
+If you want to:
+- Provide Ren as a hosted SaaS service without open-sourcing your code
+- Embed Ren in a proprietary product
+- Use Ren in ways not permitted by AGPL-3.0
+
+Please contact us for a commercial license: **clippyorg@proton.me**
+
+We offer flexible commercial licensing options for businesses.
+
+---
+
+**TL;DR**: Use Ren freely for yourself. Want to make money with it? Let's talk. 🤝
 
 ---
 
@@ -712,10 +735,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/fl_js/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/fl_js/discussions)
+- **Issues**: [GitHub Issues](https://github.com/CLIP-py/ComfyUI-RenAgent/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/CLIP-py/ComfyUI-RenAgent/discussions)
 - **Documentation**: See `notes/implementation/` for detailed docs
 
 ---
 
-**Built with ❤️ for the ComfyUI community**
+**Built with ❤️🍆 for the ComfyUI community**
